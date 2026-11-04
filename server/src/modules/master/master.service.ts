@@ -134,6 +134,9 @@ export class MasterService {
 
         existing.email = payload.email.toLowerCase().trim();
         existing.fullName = payload.fullName.trim();
+        if (String(existing.roleId) !== String(payload.roleId) || (payload.isActive !== undefined && existing.isActive !== payload.isActive)) {
+          existing.tokenVersion = (existing.tokenVersion ?? 0) + 1;
+        }
         existing.roleId = new Types.ObjectId(payload.roleId);
         if (payload.isActive !== undefined) existing.isActive = payload.isActive;
         if (payload.password && payload.password.length < 10) {

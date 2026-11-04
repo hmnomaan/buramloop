@@ -1,5 +1,5 @@
 // client/src/components/ui/CrossCuttingPanels.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Paperclip,
   UploadCloud,
@@ -9,6 +9,7 @@ import {
   HardDrive,
   ShieldCheck,
   Ban,
+  AlertCircle,
 } from 'lucide-react';
 import { apiClient } from '../../lib/apiClient';
 import { StatusBadge, ReasonDialog } from './IndustrialPrimitives';
@@ -16,6 +17,7 @@ import { StatusBadge, ReasonDialog } from './IndustrialPrimitives';
 export interface AttachmentRecord {
   _id: string;
   entityType: string;
+  entityId?: string;
   entityCode: string;
   docType: string;
   originalName: string;
@@ -30,12 +32,30 @@ export interface AttachmentRecord {
   status: 'ACTIVE' | 'VOID';
 }
 
+const DATASET_NORMALIZATION_MAP: Record<string, string> = {
+  INCOMING_LOTS: 'INCOMING_LOTS',
+  DRUMS: 'DRUM_STOCK',
+  DRUM_STOCK: 'DRUM_STOCK',
+  BATCHES: 'BATCHES_PROCESS',
+  BATCHES_PROCESS: 'BATCHES_PROCESS',
+  SHIPMENT_LOTS: 'SHIPMENT_LOTS',
+  AUDIT_LOGS: 'AUDIT_LOGS',
+};
+
 export const ExportMenu: React.FC<{
-  dataset: 'INCOMING_LOTS' | 'DRUMS' | 'BATCHES' | 'SHIPMENT_LOTS' | 'AUDIT_LOGS';
+  dataset:
+    | 'INCOMING_LOTS'
+    | 'DRUMS'
+    | 'DRUM_STOCK'
+    | 'BATCHES'
+    | 'BATCHES_PROCESS'
+    | 'SHIPMENT_LOTS'
+    | 'AUDIT_LOGS';
   label?: string;
 }> = ({ dataset, label = 'Snapshot Export' }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const handleExport = async (
     format: 'CSV' | 'XLSX' | 'PDF' | 'DOCX' | 'PRINT',
@@ -43,25 +63,37 @@ export const ExportMenu: React.FC<{
   ) => {
     setIsExporting(true);
     setBanner(null);
+    setExportError(null);
+    const normalizedDataset = DATASET_NORMALIZATION_MAP[dataset] || dataset;
+    const normalizedFormat = format === 'PRINT' ? 'PRINT_JSON' : format;
     try {
       if (format === 'PRINT') {
         window.print();
       }
-      const res = await apiClient.request<{
-        rowCount: number;
-        nextcloudPath: string | null;
-        csvPayload?: string;
-      }>('/exports/run', {
-        method: 'POST',
-        body: JSON.stringify({ dataset, format, saveToNextcloud }),
+      const res = await apiClient.auditedMutation<
+        {
+          rowCount: number;
+          nextcloudPath: string | null;
+          csvContent?: string;
+          csvPayload?: string;
+        },
+        Record<string, unknown>
+      >('/exports/run', 'POST', {
+        body: {
+          dataset: normalizedDataset,
+          format: normalizedFormat,
+          saveToNextcloud,
+        },
+        reason: `Snapshot export (${normalizedFormat}) requested for ${normalizedDataset}`,
       });
 
-      if (res.csvPayload && format === 'CSV') {
-        const blob = new Blob([res.csvPayload], { type: 'text/csv;charset=utf-8;' });
+      const csvText = res.csvContent ?? res.csvPayload;
+      if (csvText && format === 'CSV') {
+        const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${dataset}-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.download = `${normalizedDataset}-${new Date().toISOString().slice(0, 10)}.csv`;
         a.click();
         URL.revokeObjectURL(url);
       }
@@ -71,9 +103,9 @@ export const ExportMenu: React.FC<{
           res.nextcloudPath ? ` → Archived to Nextcloud: ${res.nextcloudPath}` : ''
         }`
       );
-    } catch {
-      setBanner(
-        `Snapshot Export (${format}) logged for ${dataset} (RBAC price-stripping active).`
+    } catch (err) {
+      setExportError(
+        err instanceof Error ? err.message : `Snapshot export (${format}) failed.`
       );
     } finally {
       setIsExporting(false);
@@ -112,17 +144,22 @@ export const ExportMenu: React.FC<{
       {banner && (
         <span className="text-[11px] font-mono text-buram-success">{banner}</span>
       )}
+      {exportError && (
+        <span className="text-[11px] font-mono text-buram-critical">{exportError}</span>
+      )}
     </div>
   );
 };
 
 export const AttachmentsPanel: React.FC<{
   entityType: string;
+  entityId?: string;
   entityCode: string;
   defaultDocType?: string;
   initialAttachments?: AttachmentRecord[];
 }> = ({
   entityType,
+  entityId,
   entityCode,
   defaultDocType = 'QSI_CERTIFICATE',
   initialAttachments = [],
@@ -131,44 +168,52 @@ export const AttachmentsPanel: React.FC<{
   const [docType, setDocType] = useState(defaultDocType);
   const [voidTarget, setVoidTarget] = useState<AttachmentRecord | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const params = new URLSearchParams({ entityType, entityCode, includeVoid: 'true' });
+    if (entityId) params.set('entityId', entityId);
+
+    void apiClient
+      .request<AttachmentRecord[]>(`/attachments?${params.toString()}`)
+      .then((rows) => {
+        if (active && Array.isArray(rows)) {
+          setAttachments(rows);
+        }
+      })
+      .catch(() => {
+        // Keep initialAttachments if server list fails
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [entityType, entityId, entityCode]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploading(true);
+    setErrorMsg(null);
     try {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('entityType', entityType);
+      if (entityId) formData.append('entityId', entityId);
       formData.append('entityCode', entityCode);
       formData.append('docType', docType);
 
-      try {
-        const created = await apiClient.request<AttachmentRecord>('/attachments/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        setAttachments((prev) => [created, ...prev]);
-      } catch {
-        // Offline deterministic fallback preview showing canonical Nextcloud path
-        const mockRecord: AttachmentRecord = {
-          _id: `att-${Date.now()}`,
-          entityType,
-          entityCode,
-          docType,
-          originalName: file.name,
-          sizeBytes: file.size,
-          sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-          storage: {
-            provider: 'nextcloud',
-            path: `BuramLoop/${entityType}/${entityCode}/${docType}/${file.name}`,
-          },
-          createdAt: new Date().toISOString(),
-          status: 'ACTIVE',
-        };
-        setAttachments((prev) => [mockRecord, ...prev]);
-      }
+      const created = await apiClient.request<AttachmentRecord>('/attachments/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      setAttachments((prev) => [created, ...prev]);
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : 'Failed to upload attachment to vault.'
+      );
     } finally {
       setIsUploading(false);
       e.target.value = '';
@@ -177,18 +222,22 @@ export const AttachmentsPanel: React.FC<{
 
   const handleConfirmVoid = async (reason: string) => {
     if (!voidTarget) return;
+    setErrorMsg(null);
     try {
       await apiClient.auditedMutation(`/attachments/${voidTarget._id}/void`, 'POST', {
-        body: {},
+        body: { reason },
         reason,
       });
-    } catch {
-      // Fallback
+      setAttachments((prev) =>
+        prev.map((a) => (a._id === voidTarget._id ? { ...a, status: 'VOID' } : a))
+      );
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : 'Failed to void attachment.'
+      );
+    } finally {
+      setVoidTarget(null);
     }
-    setAttachments((prev) =>
-      prev.map((a) => (a._id === voidTarget._id ? { ...a, status: 'VOID' } : a))
-    );
-    setVoidTarget(null);
   };
 
   return (
@@ -197,7 +246,7 @@ export const AttachmentsPanel: React.FC<{
         <div className="flex items-center gap-2">
           <Paperclip className="w-4 h-4 text-buram-amber" />
           <h3 className="text-sm font-semibold text-buram-text">
-            Nextcloud Document & Certificate Vault (R12 / R16) —{' '}
+            Nextcloud Document &amp; Certificate Vault (R12 / R16) —{' '}
             <span className="font-mono text-buram-gold">{entityCode}</span>
           </h3>
         </div>
@@ -211,9 +260,11 @@ export const AttachmentsPanel: React.FC<{
           >
             <option value="QSI_CERTIFICATE">QSI_CERTIFICATE</option>
             <option value="EXTERNAL_ANALYSIS_REPORT">EXTERNAL_ANALYSIS_REPORT</option>
-            <option value="PURCHASE_CONTRACT">PURCHASE_CONTRACT</option>
+            <option value="CONTRACT_PDF">CONTRACT_PDF</option>
             <option value="DELIVERY_NOTE">DELIVERY_NOTE</option>
-            <option value="PROCESS_LOG_SCAN">PROCESS_LOG_SCAN</option>
+            <option value="BATCH_PROCESS_SHEET">BATCH_PROCESS_SHEET</option>
+            <option value="CUSTOMS_EUR1">CUSTOMS_EUR1</option>
+            <option value="OTHER">OTHER</option>
           </select>
 
           <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1 rounded bg-buram-amber text-buram-ink font-bold uppercase hover:bg-buram-gold">
@@ -228,6 +279,16 @@ export const AttachmentsPanel: React.FC<{
           </label>
         </div>
       </div>
+
+      {errorMsg && (
+        <div
+          role="alert"
+          className="mt-3 p-2.5 rounded bg-buram-critical/15 border border-buram-critical/50 flex items-center gap-2 text-xs font-mono text-buram-critical"
+        >
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
 
       {attachments.length === 0 ? (
         <div className="py-4 text-xs font-mono text-buram-muted">
@@ -271,7 +332,7 @@ export const AttachmentsPanel: React.FC<{
               {att.status === 'ACTIVE' && (
                 <div className="flex items-center gap-2 shrink-0">
                   <a
-                    href={`/api/v1/attachments/${att._id}/download`}
+                    href={`${import.meta.env.VITE_API_BASE_URL || '/api/v1'}/attachments/${att._id}/download`}
                     target="_blank"
                     rel="noreferrer"
                     className="px-2.5 py-1 rounded bg-buram-elevated border border-buram-border text-buram-tech hover:border-buram-tech inline-flex items-center gap-1"

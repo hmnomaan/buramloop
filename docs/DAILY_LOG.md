@@ -418,7 +418,8 @@ check.
   optional sample-weight field and made the sample-to-contract progression
   visible beneath “Sourcing decisions and contracts.” Documented the numeric
   Postman payload requirement.
-- Validation passed: `pnpm typecheck` and `pnpm build`. No live browser/API
+- Validation passed: `pnpm typecheck` and `pnpm build`.
+ No live browser/API
   click-through was run. See [BL-042](./ISSUES_AND_FIXES.md#resolved).
 - Fixed BL-043: incoming-lot QA pass/fail and mismatch return now call the
   audited stock endpoints and update the UI only after the API succeeds. QA
@@ -491,6 +492,19 @@ check.
   preserved the special operational and architectural rule notes in
   [BURAMLOOP_CONTEXT.md](./BURAMLOOP_CONTEXT.md).
 - Validation passed: `pnpm typecheck` and `pnpm build`.
+
+## 2026-11-04
+
+- **Completed:** Conducted a full read-only technical audit of the BURAMLOOP monorepo (`shared`, `server`, `client`, and infrastructure) and implemented the approved remediation plan (`BL-049`):
+  - Added `'WARM_READY'`, `'DEVIATION_MISMATCH'`, and `'PROCESS_DEVIATION'` to `NOTIFICATION_TYPES` (`shared/src/schemas/outbound.ts`) so `NotificationModel.create` no longer aborts QA fail, mismatch return, early warm-out, or process-loss transactions.
+  - Stopped `BatchService.approveAndReserveBatch` from mutating `Customer.allowedCountries` master data and updated `ShipmentService.createShipmentLot` to honor `batch.allowedCountries` for the batch's customer and enforce cumulative `orderedKg` limits across all non-void shipment lots of a batch.
+  - Fixed `ProcessService.executeStage` so `batch.totalInputKg` records the initial stage input and `batch.totalFilledKg` records the latest stage output instead of summing across all 7 stages.
+  - Mounted `GET /api/v1/stock/drums/:id/zpl-label` and `GET /api/v1/stock/barcode/:code` in `stock.routes.ts` / `stock.controller.ts`, added query-string sanitization against NoSQL operator injection, and applied `sanitizeCommercialDataForRole` on drum and package list endpoints.
+  - Wired `CrossCuttingPanels.tsx` (`ExportMenu` & `AttachmentsPanel`), `SourcingWorkspace.tsx`, `IncomingStockWorkspace.tsx`, `MasterDataWorkspace.tsx`, and `App.tsx` to live backend contracts (including `/api/v1/attachments/health`, deterministic `entityId` fallback and `entityCode` filtering, valid `ATTACHMENT_DOC_TYPES`, real file streaming/upload/void error handling, and required `externalAnalysis` gate payload).
+  - Added `validateBody` Zod schemas to mutating routes in `master.routes.ts`, `batch.routes.ts`, `warm-room.routes.ts`, `process.routes.ts`, `cost.routes.ts`, and `export.routes.ts`; bumped `User.tokenVersion` on role/active changes; added `StockMovement` update immutability hooks; deduplicated health routes and restricted `/api/v1/health/full` to `Admin`; masked 500 error messages in production; and deleted 18 zero-byte files plus the duplicate `client/client` directory.
+- **Issues/fixes:** [BL-049](./ISSUES_AND_FIXES.md#resolved), tracked in [TECHNICAL_AUDIT_REPORT.md](./TECHNICAL_AUDIT_REPORT.md) (`v1.0` → `v1.1`).
+- **Validation:** `tsc --noEmit` across `shared`, `server`, and `client` passed (0 errors); 11 server unit test suites (48 tests) passed. (The 3 `MongoMemoryReplSet` suites require non-sandboxed localhost TCP socket permissions in this environment.)
+- **Open/blockers:** Live MongoDB/Nextcloud deployment and browser acceptance remain open.
 
 ## Daily entry template
 

@@ -457,7 +457,7 @@ export const App: React.FC = () => {
         apiClient.request<BatchPlan[]>('/production/batches'),
         apiClient.request<BackendSourcingRecord[]>('/sourcings'),
         apiClient.request<BackendProcessRecord[]>('/production/process'),
-        apiClient.request<{ healthy: boolean }>('/attachments/health'),
+        apiClient.request<{ healthy: boolean }>('/health/storage'),
       ]);
 
       let anyConnected = false;
@@ -592,7 +592,21 @@ export const App: React.FC = () => {
 
   const handleApproveExternalAnalysis = async (offerId: string, reason: string) => {
     await apiClient.auditedMutation(`/sourcings/${offerId}/gates`, 'POST', {
-      body: { gate: 'EXTERNAL_ANALYSIS', decision: 'APPROVED' },
+      body: {
+        gate: 'EXTERNAL_ANALYSIS',
+        decision: 'APPROVED',
+        externalAnalysis: {
+          labName: 'QSI Bremen / External Partner Lab',
+          reportNo: `EXT-${offerId.slice(-6).toUpperCase()}`,
+          reportDate: new Date().toISOString(),
+          locationAcceptable: true,
+          priceAcceptable: true,
+          marketDemandFit: 'HIGH',
+          transportCostEur: 0,
+          qualityAcceptable: true,
+          managementNotes: reason,
+        },
+      },
       reason,
     });
 

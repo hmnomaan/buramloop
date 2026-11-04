@@ -1338,17 +1338,8 @@ export class BatchService {
       const existingAllowed = (customer.allowedCountries ?? []).map((c) =>
         String(c).toUpperCase()
       );
-      const mergedAllowed = [...new Set([...allocatedCountries, ...existingAllowed])].slice(0, 3);
+      const mergedAllowed = [...new Set([...existingAllowed, ...allocatedCountries])].slice(0, 3);
       const resolvedAllowedCountries = mergedAllowed.length > 0 ? mergedAllowed : ['DE'];
-
-      if (
-        allocatedCountries.some((c) => !existingAllowed.includes(c)) &&
-        resolvedAllowedCountries.length >= 1 &&
-        resolvedAllowedCountries.length <= 3
-      ) {
-        customer.allowedCountries = resolvedAllowedCountries;
-        await customer.save({ session });
-      }
 
       const year = new Date().getFullYear().toString().slice(-2);
       const counter = await CounterModel.findOneAndUpdate(

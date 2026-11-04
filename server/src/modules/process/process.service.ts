@@ -494,8 +494,8 @@ export class ProcessService {
         }
       }
       batch.currentStage = input.sevenStageTarget;
-      batch.totalInputKg = Number((batch.totalInputKg + input.inKg).toFixed(3));
-      batch.totalFilledKg = Number((batch.totalFilledKg + input.outKg).toFixed(3));
+      batch.totalInputKg = priorSteps.length === 0 || batch.totalInputKg <= 0 ? Number(input.inKg.toFixed(3)) : batch.totalInputKg;
+      batch.totalFilledKg = Number(input.outKg.toFixed(3));
       batch.totalLossKg = Number((batch.totalLossKg + input.lossKg).toFixed(3));
       batch.totalReworkOutKg = Number(
         (batch.totalReworkOutKg + input.reworkOutKg).toFixed(3)

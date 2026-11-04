@@ -48,6 +48,9 @@ export const NOTIFICATION_TYPES = [
   'RESERVATION_EXPIRING',
   'QA_GATE_REJECTED',
   'COST_REPORT_GENERATED',
+  'WARM_READY',
+  'DEVIATION_MISMATCH',
+  'PROCESS_DEVIATION',
 ] as const;
 
 export type NotificationType =

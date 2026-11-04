@@ -18,6 +18,7 @@ const uploadMiddleware = multer({
 const router = Router();
 router.use(authenticate);
 
+router.get('/health', AttachmentController.health);
 router.get('/', requirePermission('attachments:read'), AttachmentController.list);
 router.get(
   '/integrity-check',

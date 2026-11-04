@@ -5,7 +5,7 @@ import { ReasonSchema } from './common.ts';
 export const MATERIAL_KINDS = ['HONEY', 'POLLEN', 'COMB', 'FLAVOUR', 'OTHER'] as const;
 export type MaterialKind = (typeof MATERIAL_KINDS)[number];
 
-export const QUALITY_GRADE_CODES = ['Quality1', 'Quality2', 'Quality3'] as const;
+export const QUALITY_GRADE_CODES = ['Quality1', 'Quality2', 'Quality3', 'QUALITY_1', 'QUALITY_2', 'QUALITY_3'] as const;
 export type QualityGradeCode = (typeof QUALITY_GRADE_CODES)[number];
 
 export const MATERIAL_UNITS = ['kg', 'l', 'piece'] as const;
@@ -36,6 +36,7 @@ export const UpsertMaterialSchema = z.object({
 export const UpsertQualityGradeSchema = z.object({
   code: z.enum(QUALITY_GRADE_CODES),
   name: z.string().trim().min(2).max(80),
+  rank: z.number().int().min(1).max(10).default(1),
   description: z.string().trim().max(300).optional(),
   maxMoisturePct: z.number().positive().max(25).default(20),
   maxHmfMgPerKg: z.number().positive().max(80).default(40),

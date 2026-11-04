@@ -54,7 +54,7 @@ export const MasterDataWorkspace: React.FC = () => {
     try {
       const [materialRows, counterRows] = await Promise.all([
         apiClient.request<Material[]>('/master/materials'),
-        apiClient.request<Counter[]>('/master/counters'),
+        apiClient.request<Counter[]>('/master/counters').catch(() => [] as Counter[]),
       ]);
       setMaterials(materialRows);
       setCounters(counterRows);

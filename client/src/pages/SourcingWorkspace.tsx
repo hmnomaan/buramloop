@@ -545,6 +545,7 @@ export const SourcingWorkspace: React.FC<{ user: UserSession }> = ({ user }) => 
       {selectedRecord && (
         <AttachmentsPanel
           entityType="SOURCING"
+          entityId={selectedRecord._id}
           entityCode={selectedRecord.sourcingNo}
           defaultDocType="EXTERNAL_ANALYSIS_REPORT"
         />

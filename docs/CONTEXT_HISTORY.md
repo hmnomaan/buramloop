@@ -444,7 +444,7 @@ above are historical snapshots; see the current [master handoff](./BURAMLOOP_MAS
 and [roadmap](./ROADMAP.md) for active status.*
 
 
-### Special notes for consistency and update with the entire system ### 
+### Special notes for consistency and update with the entire system ###
 keep it as note:
 
 >>> i need to mention here that, the  there will three types of packages to receive, IBC,DRUM,Bucket/Tray, the unit can be in Tons/Kgs, if its 72drum the total kg can be any digits...we must get unit weight , which is per packgae how much kg we are getting...and the price , source country , will be added in parcentage of weight and price, 100parcent of origin country will be added with price , weight and in filling or rework(leftover) for next filling, the rework will peserve the weight percantage, price value and origin country, ,if we blend it with new origin it should have the track of different price and source and weight in percentage level as well.>>>
@@ -585,7 +585,7 @@ and [roadmap](./ROADMAP.md) for active status.*
 
 
 
-> special note: for short note: SOurce/Supplier with info -> Price offer -> external analysis part (mostly decision made by choice of location, price, market demand , transport cost, quality, then sample request from supplier, or supplier sends sample to qsi)--> after report publishing --> there is inhouse QA test happens , if everything matches admin/ management goes for  contract--> then the incoming lots comes... 
+> special note: for short note: SOurce/Supplier with info -> Price offer -> external analysis part (mostly decision made by choice of location, price, market demand , transport cost, quality, then sample request from supplier, or supplier sends sample to qsi)--> after report publishing --> there is inhouse QA test happens , if everything matches admin/ management goes for  contract--> then the incoming lots comes...
 
 >here whatever we get offers the total weight should be calculated in per unit of kgs with the price, like no matter how many tons we rcv there will system generated value of per unit in kg and euro price..
 
@@ -649,7 +649,8 @@ and [roadmap](./ROADMAP.md) for active status.*
   under “Sourcing decisions and contracts.”
 - Documented that Postman must send `weightGrams` as a JSON number or omit the
   property when unknown.
-- Validation passed: `pnpm typecheck` and `pnpm build`. No live browser/API
+- Validation passed: `pnpm typecheck` and `pnpm build`.
+ No live browser/API
   click-through was run.
 
 ## ctx-v57 — Persisted incoming-lot QA and batch progression (2026-11-03)
@@ -706,3 +707,31 @@ and [roadmap](./ROADMAP.md) for active status.*
 - Removed internal specification/roadmap step labels (`STEP 5D..6I`, `5G/5H/5I/5J` nav badges), rule codes (`R1`–`R14`), raw API route hints, Nextcloud storage path strings, and verbose collection/schema descriptions from the client workspaces (`AppShell.tsx`, `IndustrialPrimitives.tsx`, `OperationsDashboard.tsx`, `WarmCabinetsWorkspace.tsx`, `BatchPlanningWorkspace.tsx`, `ProcessingWorkspace.tsx`, `ShipmentLotsWorkspace.tsx`, `WarehouseStockLedgerWorkspace.tsx`, `IncomingStockWorkspace.tsx`, `SourcingWorkspace.tsx`, `AdminCostsWorkspace.tsx`, `TraceabilityAuditWorkspace.tsx`, and `MasterDataWorkspace.tsx`).
 - Preserved all special operational, sensor/telemetry, mass-balance, Nextcloud path, and `R1`–`R14` domain rule notes in [BURAMLOOP_CONTEXT.md](./BURAMLOOP_CONTEXT.md).
 - Validation passed: `pnpm typecheck` and `pnpm build`.
+
+## ctx-v63 — Comprehensive codebase audit & full-stack remediation (2026-11-04)
+
+- Completed a full-stack technical inspection across `shared`, `server`, `client`, and infrastructure, followed by incremental fixes (`BL-049`):
+  - **Shared Schemas (`shared/src/schemas/outbound.ts`, `shared/src/schemas/master.ts`):** Added `'WARM_READY'`, `'DEVIATION_MISMATCH'`, and `'PROCESS_DEVIATION'` to `NOTIFICATION_TYPES` to prevent Mongoose validation rollbacks during QA rejection, mismatch return, early warm-out, and >2.5% process loss alerts; aligned `UpsertQualityGradeSchema` with `rank` and uppercase quality grade codes.
+  - **Batch, Process & Shipment Integrity (`batch.service.ts`, `process.service.ts`, `shipment.service.ts`):** Removed customer master `allowedCountries` mutation from `BatchService.approveAndReserveBatch`; updated `ShipmentService.createShipmentLot` to honor batch-approved origins for the batch's customer and enforce cumulative `orderedKg` limits across all non-void shipment lots for a batch; fixed `ProcessService.executeStage` so `batch.totalInputKg` and `batch.totalFilledKg` preserve mass balance instead of accumulating across sequential steps.
+  - **Stock, Barcode, Attachment & Export APIs (`stock.routes.ts`, `stock.controller.ts`, `attachment.*`, `export.*`):** Mounted `GET /api/v1/stock/drums/:id/zpl-label` and `GET /api/v1/stock/barcode/:code`; added query-string sanitization and commercial price masking on `/stock/drums` and `/stock/packages`; added `GET /api/v1/attachments/health`, `entityCode` filtering, and deterministic `entityId` fallback; fixed `ExportService.listExportLogs` sort order (`{ createdAt: -1 }`).
+  - **Route Validation, Auth & Ledger Hardening (`master.*`, `batch.routes.ts`, `warm-room.routes.ts`, `process.routes.ts`, `cost.routes.ts`, `export.routes.ts`, `stock.model.ts`, `app.ts`, `error.middleware.ts`):** Added `validateBody` Zod validation to mutating routes; incremented `User.tokenVersion` when `roleId` or `isActive` changes; added `updateOne`/`updateMany`/`findOneAndUpdate`/`replaceOne` immutability pre-hooks on `StockMovementSchema`; removed duplicate `/health` and `/health/storage` routes; protected `/api/v1/health/full` with `authenticate` + `requireAdminOnly`; and sanitized 500 error messages in production.
+  - **Frontend Integration & Cleanup (`App.tsx`, `CrossCuttingPanels.tsx`, `SourcingWorkspace.tsx`, `IncomingStockWorkspace.tsx`, `MasterDataWorkspace.tsx`):** Wired `ExportMenu` and `AttachmentsPanel` to real API payloads and download streams without fake local fallbacks; passed required `externalAnalysis` fields in `App.tsx`; handled `/master/counters` 403 gracefully for non-Admin roles; and removed 18 zero-byte placeholder files plus the stray `client/client` directory.
+- Validation passed: `tsc --noEmit` across `shared`, `server`, and `client` (0 errors) and 11 server unit test suites (48 tests). See [BL-049](./ISSUES_AND_FIXES.md#resolved) and [TECHNICAL_AUDIT_REPORT.md](./TECHNICAL_AUDIT_REPORT.md) (`v1.1`).
+
+
+## RULES  for  BURAMLOOP AI DEVELOPMENT
+
+1. Inspect existing code before proposing changes.
+2. Explain the intended changes before editing.
+3. Do not modify files until I approve the plan.
+4. Do not run destructive commands.
+5. Do not install, upgrade or remove dependencies without approval.
+6. Do not change database schemas or migrations without approval.
+7. Never access, print or transmit secrets from .env files.
+8. Preserve existing API contracts unless explicitly approved.
+9. Make small, focused changes rather than broad rewrites.
+10. After editing, list every changed file and explain why.
+11. Show the Git diff before asking me to commit.
+12. Run relevant tests only after approval.
+13. Report failures honestly; never claim tests passed without running them.
+14. Wait for my approval before staging or committing.

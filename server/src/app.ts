@@ -8,6 +8,8 @@ import { env } from './config/env';
 import { authRouter } from './modules/auth/auth.routes';
 import { errorHandler } from './middlewares/error.middleware';
 import { AppError } from './common/errors';
+import { authenticate } from './middlewares/auth.middleware';
+import { requireAdminOnly } from './middlewares/rbac.middleware';
 import { masterRouter } from './modules/master/master.routes';
 import { sourcingRouter } from './modules/sourcing/sourcing.routes';
 import { stockRoutes } from './modules/stock/stock.routes';
@@ -50,26 +52,6 @@ export function createApp(): Express {
         });
     });
 
-    app.get('/api/v1/health', async (_req, res) => {
-        const dbState = mongoose.connection.readyState;
-        const isDbReady = dbState === 1; // 1 means connected
-        res.status(isDbReady ? 200 : 503).json({
-            ok: isDbReady,
-            dbState: isDbReady ? 'connected' : 'disconnected',
-            timestamp: new Date().toISOString(),
-        });
-    });
-
-    // // Health check endpoint for MongoDB replica set status
-    // app.get('/api/v1/health/db/replica', async (_req, res) => {
-    //     const adminDb = mongoose.connection.db.admin();
-    //     const replicaSetStatus = await adminDb.replicaSetGetStatus();
-    //     res.status(200).json({
-    //         ok: true,
-    //         replicaSetStatus,
-    //         timestamp: new Date().toISOString(),
-    //     });
-    // });
     app.get('/api/v1/health/storage', async (_req, res, next) => {
         try {
             const storage = getStorageProvider();
@@ -80,7 +62,7 @@ export function createApp(): Express {
         }
     });
 
-    app.get('/api/v1/health/full', async (_req, res, next) => {
+    app.get('/api/v1/health/full', authenticate, requireAdminOnly, async (_req, res, next) => {
         try {
             const dbReady = mongoose.connection.readyState === 1;
             const storage = getStorageProvider();
@@ -118,17 +100,11 @@ export function createApp(): Express {
         }
     });
 
-
     // API routes
     app.use('/api/v1/auth', authRouter);
     app.use('/api/v1/master', masterRouter); // Step 5b Master Data API
     app.use('/api/v1/sourcings', sourcingRouter); // Step 5c Sourcing & Purchase Gates API
     app.use('/api/v1/stock', stockRoutes);
-
-    app.get('/api/v1/health/storage', async (_req, res) => {
-        const result = await getStorageProvider().healthCheck();
-        res.status(result.ok ? 200 : 503).json(result);
-    });
     app.use('/api/v1/attachments', attachmentRoutes);
     // Mount Step 5f routes:
     app.use('/api/v1/batches', batchRouter);
@@ -141,7 +117,6 @@ export function createApp(): Express {
     app.use('/api/v1/production/batches', batchRouter);
     app.use('/api/v1/notifications', notificationRouter);
     app.use('/api/v1/audit', auditRouter);
-
 
     // 404 handler
     app.use((req, _res, next) => {

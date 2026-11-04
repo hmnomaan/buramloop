@@ -1,21 +1,43 @@
 // server/src/modules/attachment/attachment.controller.ts
+import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { UploadAttachmentMetaSchema } from '@buramloop/shared';
 import { AppError } from '../../common/errors';
 import { getAuditActor } from '../../common/audit.helper';
+import { getStorageProvider } from '../../storage';
 import { AttachmentService } from './attachment.service';
 
 export class AttachmentController {
+  static async health(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await getStorageProvider().healthCheck();
+      res.json({ ok: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async upload(req: Request, res: Response, next: NextFunction) {
     try {
       const file = (req as Request & {
         file?: Parameters<typeof AttachmentService.uploadAttachment>[1];
       }).file;
-      // Validate that a file is provided 
       if (!file) {
         throw AppError.badRequest('Multipart file field "file" is required');
       }
-      const parsedMeta = UploadAttachmentMetaSchema.safeParse(req.body);
+
+      const fallbackEntityId =
+        req.body?.entityId ||
+        crypto
+          .createHash('md5')
+          .update(`${req.body?.entityType || 'ENTITY'}:${req.body?.entityCode || 'UNKNOWN'}`)
+          .digest('hex')
+          .slice(0, 24);
+
+      const parsedMeta = UploadAttachmentMetaSchema.safeParse({
+        ...req.body,
+        entityId: fallbackEntityId,
+      });
       if (!parsedMeta.success) {
         throw AppError.validation(parsedMeta.error.errors.map((e) => e.message).join('; '));
       }
@@ -35,9 +57,10 @@ export class AttachmentController {
     try {
       const data = await AttachmentService.listAttachments(
         {
-          entityType: req.query.entityType as string | undefined,
-          entityId: req.query.entityId as string | undefined,
-          docType: req.query.docType as string | undefined,
+          entityType: typeof req.query.entityType === 'string' ? req.query.entityType : undefined,
+          entityId: typeof req.query.entityId === 'string' ? req.query.entityId : undefined,
+          entityCode: typeof req.query.entityCode === 'string' ? req.query.entityCode : undefined,
+          docType: typeof req.query.docType === 'string' ? req.query.docType : undefined,
           includeVoid: req.query.includeVoid === 'true',
         },
         getAuditActor(req)
@@ -73,7 +96,7 @@ export class AttachmentController {
     try {
       const data = await AttachmentService.voidAttachment(
         String(req.params.id),
-        String(req.body.reason),
+        String(req.body.reason || (req as any).auditReason || req.headers['x-audit-reason'] || ''),
         getAuditActor(req)
       );
       res.json({ ok: true, data });

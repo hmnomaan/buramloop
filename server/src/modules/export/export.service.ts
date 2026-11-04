@@ -186,6 +186,6 @@ export class ExportService {
   }
 
   static async listExportLogs() {
-    return ExportLogModel.find().sort({ exportedAt: -1 }).limit(50).lean();
+    return ExportLogModel.find().sort({ createdAt: -1 }).limit(50).lean();
   }
 }

@@ -24,13 +24,20 @@ export class ShipmentService {
     batchId?: string;
   } = {}): Promise<unknown[]> {
     const query: Record<string, unknown> = {};
-    if (filters.status) query.status = filters.status;
-    if (filters.customerId) query.customerId = filters.customerId;
-    if (filters.batchId) query.batchId = filters.batchId;
+    if (typeof filters.status === 'string' && filters.status.trim()) {
+      query.status = filters.status.trim();
+    }
+    if (typeof filters.customerId === 'string' && filters.customerId.trim()) {
+      query.customerId = filters.customerId.trim();
+    }
+    if (typeof filters.batchId === 'string' && filters.batchId.trim()) {
+      query.batchId = filters.batchId.trim();
+    }
     const lots = await ShipmentLotModel.find(query)
       .populate('customerId', 'name code allowedCountries blockedCountries country')
       .populate('batchId', 'processNo status originComposition actualOutKg')
       .sort({ createdAt: -1 })
+      .limit(500)
       .lean();
 
     const lotIds = lots.map((lot) => lot._id);
@@ -74,9 +81,9 @@ export class ShipmentService {
         throw new AppError(404, 'CUSTOMER_NOT_FOUND', `Customer ${input.customerId} not found or inactive.`);
       }
 
-      const allowed: string[] = customer.allowedCountries || [];
+      const customerAllowed: string[] = customer.allowedCountries || [];
       const blocked: string[] = customer.blockedCountries || [];
-      if (allowed.length < 1 || allowed.length > 3) {
+      if (customerAllowed.length < 1 || customerAllowed.length > 3) {
         throw new AppError(
           422,
           'CUSTOMER_COUNTRY_RULE_INVALID',
@@ -84,10 +91,16 @@ export class ShipmentService {
         );
       }
 
+      const isBatchDesignatedCustomer =
+        batch.customerId && String(batch.customerId) === String(customer._id);
+      const effectiveAllowed = isBatchDesignatedCustomer && Array.isArray(batch.allowedCountries) && batch.allowedCountries.length > 0
+        ? [...new Set([...customerAllowed, ...batch.allowedCountries])].slice(0, 3)
+        : customerAllowed;
+
       const batchOrigins = batch.originComposition || [];
       const forbiddenOrigins = batchOrigins
         .map((origin) => origin.country)
-        .filter((country) => !allowed.includes(country) || blocked.includes(country));
+        .filter((country) => !effectiveAllowed.includes(country) || blocked.includes(country));
       if (!batchOrigins.length || forbiddenOrigins.length) {
         throw new AppError(
           422,
@@ -97,17 +110,35 @@ export class ShipmentService {
             : `Batch ${batch.processNo} contains prohibited origin(s) [${forbiddenOrigins.join(', ')}] for customer ${customer.name}.`
         );
       }
+
       const totalItemsKg = Number(
         input.items.reduce((sum, item) => sum + item.netKg, 0).toFixed(3)
       );
+
+      const existingLots = await ShipmentLotModel.find({
+        batchId: batch._id,
+        status: { $ne: 'VOID' },
+        isVoid: { $ne: true },
+      })
+        .select('orderedKg')
+        .session(session)
+        .lean();
+      const alreadyAllocatedKg = Number(
+        existingLots.reduce((sum, lot) => sum + Number(lot.orderedKg ?? 0), 0).toFixed(3)
+      );
+      const remainingBatchKg = Math.max(
+        0,
+        Number((Number(batch.actualOutKg ?? 0) - alreadyAllocatedKg).toFixed(3))
+      );
+
       if (
-        input.orderedKg > Number(batch.actualOutKg ?? 0) + 0.001 ||
-        totalItemsKg > Number(batch.actualOutKg ?? 0) + 0.001
+        input.orderedKg > remainingBatchKg + 0.001 ||
+        totalItemsKg > remainingBatchKg + 0.001
       ) {
         throw new AppError(
           422,
           'SHIPMENT_EXCEEDS_BATCH_OUTPUT',
-          `Packaged quantity (${totalItemsKg} kg) exceeds completed batch output (${batch.actualOutKg ?? 0} kg).`
+          `Packaged quantity (${totalItemsKg} kg) exceeds remaining batch output (${remainingBatchKg} kg of ${batch.actualOutKg ?? 0} kg).`
         );
       }
 
@@ -132,7 +163,7 @@ export class ShipmentService {
             batchId: batch._id,
             processNo: batch.processNo,
             customerId: customer._id,
-            allowedCountriesSnapshot: allowed,
+            allowedCountriesSnapshot: effectiveAllowed,
             originComposition: batchOrigins,
             destinationCountry: input.destinationCountry,
             orderedKg: input.orderedKg,
@@ -170,7 +201,7 @@ export class ShipmentService {
           shipmentLotNo,
           processNo: batch.processNo,
           customer: customer.name,
-          allowedCountriesSnapshot: allowed,
+          allowedCountriesSnapshot: effectiveAllowed,
           orderedKg: input.orderedKg,
           packagedKg: totalItemsKg,
         },

@@ -2,16 +2,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { ReceiveIncomingLotSchema } from '@buramloop/shared';
-// import { Iso2CountrySchema, ObjectIdSchema, ReasonSchema } from '../../common/schemas/common.ts';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { requirePermission } from '../../middlewares/rbac.middleware';
 import { requireReason } from '../../middlewares/reason.middleware';
 import { validateBody } from '../../common/validate.middleware';
 import { StockController } from './stock.controller';
 
-const Iso2CountrySchema = z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/);
 const ObjectIdSchema = z.string().regex(/^[a-f\d]{24}$/i);
-const ReasonSchema = z.string().trim().min(1).max(1000);
+const ReasonSchema = z.string().trim().min(1).max(1000).optional();
 
 const ReviewIncomingLotBodySchema = z.object({
   decision: z.enum(['PASSED', 'FAILED']),
@@ -64,8 +62,18 @@ router.post(
   StockController.returnLotMismatch
 );
 
-// Stock packages, drums, summary & append-only ledger
+// Stock packages, drums, barcode/ZPL, summary & append-only ledger
 router.get('/drums', requirePermission('stock:read'), StockController.listDrums);
+router.get(
+  '/drums/:id/zpl-label',
+  requirePermission('stock:read'),
+  StockController.generateDrumZplLabel
+);
+router.get(
+  '/barcode/:code',
+  requirePermission('stock:read'),
+  StockController.resolveBarcode
+);
 router.get('/packages', requirePermission('stock:read'), StockController.listStockPackages);
 router.get('/summary', requirePermission('stock:read'), StockController.getStockSummary);
 router.get('/ledger', requirePermission('stock:read'), StockController.listLedgerMovements);

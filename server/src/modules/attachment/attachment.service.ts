@@ -118,12 +118,13 @@ export class AttachmentService {
    * List attachments for an entity (strips adminOnly attachments for non-Admin/Management users)
    */
   static async listAttachments(
-    filters: { entityType?: string; entityId?: string; docType?: string; includeVoid?: boolean },
+    filters: { entityType?: string; entityId?: string; entityCode?: string; docType?: string; includeVoid?: boolean },
     actor: AuditActor
   ) {
     const query: Record<string, unknown> = {};
     if (filters.entityType) query.entityType = filters.entityType;
-    if (filters.entityId) query.entityId = new mongoose.Types.ObjectId(filters.entityId);
+    if (filters.entityId && mongoose.isValidObjectId(filters.entityId)) query.entityId = new mongoose.Types.ObjectId(filters.entityId);
+    if (filters.entityCode) query.entityCode = String(filters.entityCode);
     if (filters.docType) query.docType = filters.docType;
     if (!filters.includeVoid) query.status = 'ACTIVE';
 

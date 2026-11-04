@@ -608,5 +608,16 @@ describe('BatchService origin-aware feasibility', () => {
     expect(consumeMovement.country).toBe('TR');
     expect(consumeMovement.fromStatus).toBe('InBatch');
     expect(consumeMovement.toStatus).toBe('Consumed');
+    expect(mockBatch.totalInputKg).toBe(5800);
+    expect(mockBatch.totalFilledKg).toBe(5445);
+    expect(mockBatch.totalLossKg).toBe(15);
+    expect(mockBatch.totalReworkOutKg).toBe(290);
+  });
+
+  it('includes WARM_READY, DEVIATION_MISMATCH, and PROCESS_DEVIATION in NOTIFICATION_TYPES', async () => {
+    const { NOTIFICATION_TYPES } = await import('../../../shared/src/schemas/outbound.ts');
+    expect(NOTIFICATION_TYPES).toContain('WARM_READY');
+    expect(NOTIFICATION_TYPES).toContain('DEVIATION_MISMATCH');
+    expect(NOTIFICATION_TYPES).toContain('PROCESS_DEVIATION');
   });
 });

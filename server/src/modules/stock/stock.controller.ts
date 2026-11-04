@@ -3,15 +3,20 @@ import { Request, Response, NextFunction } from 'express';
 import { DrumModel, StockMovementModel, StockPackageModel } from '../../models';
 import { getAuditActor } from '../../common/audit.helper.ts';
 import { sanitizeCommercialDataForRole } from '../../common/price-strip.helper';
+import { BarcodeService } from './barcode.service';
 import { StockService } from './stock.service';
+
+function queryString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
 
 export class StockController {
   static async listIncomingLots(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await StockService.listIncomingLotsWithUsage({
-        status: req.query.status as string | undefined,
-        country: req.query.country as string | undefined,
-        materialId: req.query.materialId as string | undefined,
+        status: queryString(req.query.status),
+        country: queryString(req.query.country),
+        materialId: queryString(req.query.materialId),
       });
       res.json({
         ok: true,
@@ -37,7 +42,7 @@ export class StockController {
   static async reviewIncomingLot(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await StockService.reviewIncomingLot(
-        { ...req.body, incomingLotId: req.params.id },
+        { ...req.body, incomingLotId: String(req.params.id) },
         getAuditActor(req)
       );
       res.json({
@@ -52,7 +57,7 @@ export class StockController {
   static async returnLotMismatch(req: Request, res: Response, next: NextFunction) {
     try {
       const data = await StockService.returnLotOnMismatch(
-        { ...req.body, incomingLotId: req.params.id },
+        { ...req.body, incomingLotId: String(req.params.id) },
         getAuditActor(req)
       );
       res.json({
@@ -67,10 +72,14 @@ export class StockController {
   static async listDrums(req: Request, res: Response, next: NextFunction) {
     try {
       const filter: Record<string, unknown> = {};
-      if (req.query.incomingLotId) filter.incomingLotId = req.query.incomingLotId;
-      if (req.query.status) filter.status = req.query.status;
-      if (req.query.country) filter.country = String(req.query.country).toUpperCase();
-      if (req.query.materialId) filter.materialId = req.query.materialId;
+      const incomingLotId = queryString(req.query.incomingLotId);
+      const status = queryString(req.query.status);
+      const country = queryString(req.query.country);
+      const materialId = queryString(req.query.materialId);
+      if (incomingLotId) filter.incomingLotId = incomingLotId;
+      if (status) filter.status = status;
+      if (country) filter.country = country.toUpperCase();
+      if (materialId) filter.materialId = materialId;
 
       const drums = await DrumModel.find(filter)
         .populate('incomingLotId', 'lotNo status receivedDate')
@@ -79,7 +88,34 @@ export class StockController {
         .limit(500)
         .lean();
 
-      res.json({ ok: true, data: drums });
+      res.json({
+        ok: true,
+        data: sanitizeCommercialDataForRole(drums, req.user?.roleName ?? ''),
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async generateDrumZplLabel(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await BarcodeService.generateDrumZplLabel(String(req.params.id));
+      res.json({ ok: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async resolveBarcode(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await BarcodeService.resolveBarcode(
+        String(req.params.code),
+        queryString(req.query.expectedCountry)
+      );
+      res.json({
+        ok: true,
+        data: sanitizeCommercialDataForRole(data, req.user?.roleName ?? ''),
+      });
     } catch (err) {
       next(err);
     }
@@ -88,11 +124,16 @@ export class StockController {
   static async listStockPackages(req: Request, res: Response, next: NextFunction) {
     try {
       const filter: Record<string, unknown> = {};
-      if (req.query.incomingLotId) filter.incomingLotId = req.query.incomingLotId;
-      if (req.query.status) filter.status = req.query.status;
-      if (req.query.packageType) filter.packageType = req.query.packageType;
-      if (req.query.country) filter.country = String(req.query.country).toUpperCase();
-      if (req.query.materialId) filter.materialId = req.query.materialId;
+      const incomingLotId = queryString(req.query.incomingLotId);
+      const status = queryString(req.query.status);
+      const packageType = queryString(req.query.packageType);
+      const country = queryString(req.query.country);
+      const materialId = queryString(req.query.materialId);
+      if (incomingLotId) filter.incomingLotId = incomingLotId;
+      if (status) filter.status = status;
+      if (packageType) filter.packageType = packageType;
+      if (country) filter.country = country.toUpperCase();
+      if (materialId) filter.materialId = materialId;
 
       const stockPackages = await StockPackageModel.find(filter)
         .populate('incomingLotId', 'lotNo status receivedDate')
@@ -101,7 +142,10 @@ export class StockController {
         .limit(1000)
         .lean();
 
-      res.json({ ok: true, data: stockPackages });
+      res.json({
+        ok: true,
+        data: sanitizeCommercialDataForRole(stockPackages, req.user?.roleName ?? ''),
+      });
     } catch (err) {
       next(err);
     }
@@ -119,10 +163,14 @@ export class StockController {
   static async listLedgerMovements(req: Request, res: Response, next: NextFunction) {
     try {
       const filter: Record<string, unknown> = {};
-      if (req.query.drumId) filter.drumId = req.query.drumId;
-      if (req.query.stockPackageId) filter.stockPackageId = req.query.stockPackageId;
-      if (req.query.incomingLotId) filter.incomingLotId = req.query.incomingLotId;
-      if (req.query.batchId) filter.batchId = req.query.batchId;
+      const drumId = queryString(req.query.drumId);
+      const stockPackageId = queryString(req.query.stockPackageId);
+      const incomingLotId = queryString(req.query.incomingLotId);
+      const batchId = queryString(req.query.batchId);
+      if (drumId) filter.drumId = drumId;
+      if (stockPackageId) filter.stockPackageId = stockPackageId;
+      if (incomingLotId) filter.incomingLotId = incomingLotId;
+      if (batchId) filter.batchId = batchId;
 
       const movements = await StockMovementModel.find(filter)
         .populate('performedBy', 'fullName email roleName')

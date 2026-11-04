@@ -391,6 +391,18 @@ StockMovementSchema.pre('validate', function (next) {
 StockMovementSchema.pre('deleteOne', blockHardDelete);
 StockMovementSchema.pre('deleteMany', blockHardDelete);
 StockMovementSchema.pre('findOneAndDelete', blockHardDelete);
+StockMovementSchema.pre('updateOne', function () {
+  throw new Error('[IMMUTABILITY_VIOLATION] Stock movement ledger entries cannot be modified.');
+});
+StockMovementSchema.pre('updateMany', function () {
+  throw new Error('[IMMUTABILITY_VIOLATION] Stock movement ledger entries cannot be modified.');
+});
+StockMovementSchema.pre('findOneAndUpdate', function () {
+  throw new Error('[IMMUTABILITY_VIOLATION] Stock movement ledger entries cannot be modified.');
+});
+StockMovementSchema.pre('replaceOne', function () {
+  throw new Error('[IMMUTABILITY_VIOLATION] Stock movement ledger entries cannot be replaced.');
+});
 export const StockMovementModel = mongoose.model<IStockMovement>('StockMovement', StockMovementSchema);
 
 export interface ILabReport extends Document {

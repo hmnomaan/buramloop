@@ -1182,6 +1182,7 @@ export const IncomingStockWorkspace: React.FC<{
       {!isStockView && (
         <AttachmentsPanel
           entityType="INCOMING_LOT"
+          entityId={lots[0]?.id}
           entityCode={lots[0]?.lotNumber || 'LOT-2026-104'}
           defaultDocType="QSI_CERTIFICATE"
         />
