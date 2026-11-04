@@ -850,7 +850,7 @@ export class StockService {
       .populate('supplierId', 'code name country')
       .populate('materialId', 'code name kind')
       .populate('qualityGradeId', 'code name')
-      .sort({ receivedDate: -1, createdAt: -1 })
+      .sort({ receivedDate: -1, createdAt: -1 }).limit(500)
       .lean();
 
     if (lots.length === 0) return [];

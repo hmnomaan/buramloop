@@ -718,6 +718,16 @@ and [roadmap](./ROADMAP.md) for active status.*
   - **Frontend Integration & Cleanup (`App.tsx`, `CrossCuttingPanels.tsx`, `SourcingWorkspace.tsx`, `IncomingStockWorkspace.tsx`, `MasterDataWorkspace.tsx`):** Wired `ExportMenu` and `AttachmentsPanel` to real API payloads and download streams without fake local fallbacks; passed required `externalAnalysis` fields in `App.tsx`; handled `/master/counters` 403 gracefully for non-Admin roles; and removed 18 zero-byte placeholder files plus the stray `client/client` directory.
 - Validation passed: `tsc --noEmit` across `shared`, `server`, and `client` (0 errors) and 11 server unit test suites (48 tests). See [BL-049](./ISSUES_AND_FIXES.md#resolved) and [TECHNICAL_AUDIT_REPORT.md](./TECHNICAL_AUDIT_REPORT.md) (`v1.1`).
 
+## ctx-v64 — Phase 4 audit security & performance completion (2026-11-04)
+
+- Completed all remaining Phase 4 items from [TECHNICAL_AUDIT_REPORT.md](./TECHNICAL_AUDIT_REPORT.md) (`v1.2` / `BL-050`):
+  - **Authentication Rate Limiting (`HIGH-07`):** Added `loginRateLimiter` (20 attempts / 15 min) and `passwordChangeRateLimiter` (10 attempts / 15 min) in `server/src/modules/auth/auth.routes.ts`.
+  - **Docker Compose Cleanup (`MED-02`):** Removed the unused `redis` service dependency from `server` in `docker-compose.yml` while keeping `redis` for `nextcloud`.
+  - **In-Memory / Cookie-Backed Token Handling (`MED-03`):** Updated `client/src/lib/apiClient.ts`, `LandingWithLoginPage.tsx`, and `App.tsx` to store the bearer token in memory (`apiClient.setBearerToken(...)`) rather than persisting raw JWTs in `window.sessionStorage`.
+  - **Bounded Queries & Parallel Storage Integrity (`MED-05`, `MED-06`):** Added `.limit(500)` bounds on `IncomingLotModel` and `PriceModel` queries in `stock.service.ts` and `sourcing.service.ts`, and updated `AttachmentService.verifyStorageIntegrity` to check WebDAV files in concurrent batches of 8.
+  - **Vite Bundle Chunk Splitting (`LOW-02`):** Added `manualChunks` (`vendor` and `scanner`) in `client/vite.config.ts`.
+- Validation passed: `tsc --noEmit` across `shared`, `server`, and `client` (0 errors) and 11 server unit test suites (48 tests). See [BL-050](./ISSUES_AND_FIXES.md#resolved) and [TECHNICAL_AUDIT_REPORT.md](./TECHNICAL_AUDIT_REPORT.md) (`v1.2`).
+
 
 ## RULES  for  BURAMLOOP AI DEVELOPMENT
 

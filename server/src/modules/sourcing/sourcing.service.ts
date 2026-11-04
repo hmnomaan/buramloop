@@ -81,7 +81,7 @@ export class SourcingService {
           supplierId: { $in: supplierIds },
           isVoid: false,
         })
-          .sort({ effectiveDate: -1 })
+          .sort({ effectiveDate: -1 }).limit(500)
           .lean()
       : [];
     const offersBySupplier = new Map<string, typeof sourcings>();
@@ -230,7 +230,7 @@ export class SourcingService {
             sourcingId: { $in: sourcingIds },
             isVoid: false,
           })
-            .sort({ effectiveDate: -1 })
+            .sort({ effectiveDate: -1 }).limit(500)
             .lean()
         : Promise.resolve([]),
       ContractModel.find({
@@ -911,7 +911,7 @@ export class SourcingService {
       .populate('materialId', 'code name kind')
       .populate('sourcingId', 'sourcingNo status')
       .populate('contractId', 'contractNo status')
-      .sort({ effectiveDate: -1 })
+      .sort({ effectiveDate: -1 }).limit(500)
       .lean();
   }
 

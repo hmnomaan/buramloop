@@ -83,8 +83,6 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-      redis:
-        condition: service_started
     environment:
       NODE_ENV: production
       PORT: 4000

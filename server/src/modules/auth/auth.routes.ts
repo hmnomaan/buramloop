@@ -17,6 +17,34 @@ import { AttachmentService } from '../attachment/attachment.service';
 
 export const authRouter: Router = Router();
 
+const authRateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function createAuthRateLimiter(maxRequests: number, windowMs: number) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    const key = `${req.path}:${req.ip || req.socket?.remoteAddress || 'local'}:${String(req.body?.email || '').toLowerCase()}`;
+    const now = Date.now();
+    const bucket = authRateLimitBuckets.get(key);
+    if (!bucket || now >= bucket.resetAt) {
+      authRateLimitBuckets.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    bucket.count += 1;
+    if (bucket.count > maxRequests) {
+      return next(
+        new AppError(
+          429,
+          'RATE_LIMIT_EXCEEDED',
+          'Too many authentication attempts. Please wait before trying again.'
+        )
+      );
+    }
+    return next();
+  };
+}
+
+const loginRateLimiter = createAuthRateLimiter(20, 15 * 60 * 1000);
+const passwordChangeRateLimiter = createAuthRateLimiter(10, 15 * 60 * 1000);
+
 const PasswordChangeSchema = z
   .object({
     currentPassword: z.string().min(1),
@@ -80,7 +108,7 @@ function hasValidImageSignature(file: Express.Multer.File): boolean {
   );
 }
 
-authRouter.post('/login', validateBody(LoginBodySchema), (req, res, next) =>
+authRouter.post('/login', loginRateLimiter, validateBody(LoginBodySchema), (req, res, next) =>
   authController.login(req, res, next)
 );
 authRouter.post('/logout', authenticate, (req, res) => authController.logout(req, res));
@@ -89,6 +117,7 @@ authRouter.get('/me', authenticate, (req, res) => authController.me(req, res));
 authRouter.patch(
   '/change-password',
   authenticate,
+  passwordChangeRateLimiter,
   validateBody(PasswordChangeSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {

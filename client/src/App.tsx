@@ -457,7 +457,7 @@ export const App: React.FC = () => {
         apiClient.request<BatchPlan[]>('/production/batches'),
         apiClient.request<BackendSourcingRecord[]>('/sourcings'),
         apiClient.request<BackendProcessRecord[]>('/production/process'),
-        apiClient.request<{ healthy: boolean }>('/health/storage'),
+        apiClient.request<{ ok?: boolean; healthy?: boolean }>('/health/storage'),
       ]);
 
       let anyConnected = false;
@@ -485,7 +485,7 @@ export const App: React.FC = () => {
         anyConnected = true;
       }
       if (ncHealth.status === 'fulfilled') {
-        setNextcloudOnline(Boolean(ncHealth.value?.healthy));
+        setNextcloudOnline(Boolean(ncHealth.value?.ok || ncHealth.value?.healthy));
       }
 
       setApiOnline(anyConnected);
@@ -518,7 +518,7 @@ export const App: React.FC = () => {
           setIsAuthenticated(true);
         }
       } catch {
-        window.sessionStorage.removeItem('buram_jwt');
+        apiClient.setBearerToken(null);
       } finally {
         if (active) {
           setIsCheckingSession(false);

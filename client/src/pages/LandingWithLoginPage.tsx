@@ -254,7 +254,7 @@ export const LandingWithLoginPage: React.FC<{
       });
 
       if (res.token) {
-        window.sessionStorage.setItem('buram_jwt', res.token);
+        apiClient.setBearerToken(res.token);
       }
 
       onAuthenticated(toUserSession(res.user));

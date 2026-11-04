@@ -28,6 +28,16 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 class BuramApiClient {
   private lastLatencyMs: number | null = null;
   private lastSyncIso: string | null = null;
+  private bearerToken: string | null = null;
+
+  public setBearerToken(token: string | null) {
+    this.bearerToken = token;
+    try {
+      window.sessionStorage.removeItem('buram_jwt');
+    } catch {
+      // ignore storage errors
+    }
+  }
 
   public getTelemetry() {
     return {
@@ -42,7 +52,7 @@ class BuramApiClient {
     init?: RequestInit
   ): Promise<TResponse> {
     const start = performance.now();
-    const token = window.sessionStorage.getItem('buram_jwt');
+    const token = this.bearerToken;
 
     const headers = new Headers(init?.headers);
     headers.set('Accept', 'application/json');

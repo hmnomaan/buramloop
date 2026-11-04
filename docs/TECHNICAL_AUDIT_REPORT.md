@@ -1,8 +1,8 @@
 # BURAMLOOP ERP — Comprehensive Technical Audit & Remediation Tracker
 
-**Document Version:** `v1.1` (Remediation Phase 1–3 Completed)  
+**Document Version:** `v1.2` (All Audit Phases 1–4 Completed)  
 **Initial Audit Date:** 2026-11-04 (`v1.0` — Read-Only Inspection)  
-**Last Updated:** 2026-11-04 (`v1.1` — `BL-049` Fixes Verified)  
+**Last Updated:** 2026-11-04 (`v1.2` — `BL-049` & `BL-050` Fixes Verified)  
 **Scope:** End-to-end inspection and ongoing monitoring of `shared`, `server`, `client`, `docker-compose.yml`, and build/test pipelines.
 
 ---
@@ -12,7 +12,8 @@
 | Version | Date | Context / Issue Ref | Summary of Changes & Verification Status |
 | :--- | :--- | :--- | :--- |
 | **`v1.0`** | 2026-11-04 | Initial Audit | Completed 100% read-only inspection across `shared`, `server`, `client`, and `docker-compose.yml`. Identified 3 Critical (`CRIT-01`–`CRIT-03`), 8 High (`HIGH-01`–`HIGH-08`), 6 Medium (`MED-01`–`MED-06`), and 2 Low (`LOW-01`–`LOW-02`) findings. |
-| **`v1.1`** | 2026-11-04 | [`ctx-v63`](./CONTEXT_HISTORY.md) / [`BL-049`](./ISSUES_AND_FIXES.md#resolved) | Completed **Phases 1, 2, and 3** (`CRIT-01`–`CRIT-03`, `HIGH-01`–`HIGH-08`, `MED-01`, `MED-04`, `LOW-01`). Verified with `tsc --noEmit` across `shared`, `server`, and `client` (0 errors) and 11 server Jest unit suites (48 tests passing). Remaining open items (`MED-02`, `MED-03`, `MED-05`, `MED-06`, `LOW-02`) tracked in [Section 7](#7-classified-findings-register--live-status-tracker). |
+| **`v1.1`** | 2026-11-04 | [`ctx-v63`](./CONTEXT_HISTORY.md) / [`BL-049`](./ISSUES_AND_FIXES.md#resolved) | Completed **Phases 1, 2, and 3** (`CRIT-01`–`CRIT-03`, `HIGH-01`–`HIGH-08`, `MED-01`, `MED-04`, `LOW-01`). Verified with `tsc --noEmit` across `shared`, `server`, and `client` (0 errors) and 11 server Jest unit suites (48 tests passing). |
+| **`v1.2`** | 2026-11-04 | [`ctx-v64`](./CONTEXT_HISTORY.md) / [`BL-050`](./ISSUES_AND_FIXES.md#resolved) | Completed **Phase 4** (`HIGH-07` auth rate limiting, `MED-02` Docker `server` Redis decoupling, `MED-03` in-memory/cookie JWT storage, `MED-05` `.limit(500)` query bounds, `MED-06` bounded parallel WebDAV integrity checks, and `LOW-02` Vite vendor/scanner manual chunk splitting). All 19 audit items (`CRIT`, `HIGH`, `MED`, `LOW`) are now **RESOLVED**. |
 
 ---
 
@@ -213,16 +214,16 @@ erDiagram
 | **HIGH-04** | **High** | **VERIFIED ISSUE** | Duplicate health route registrations & 23 stray/empty files | **RESOLVED (`v1.1` / `BL-049`)** | Deduplicated `/health` and `/health/storage` in `app.ts` and deleted 18 zero-byte files + `client/client/src`. |
 | **HIGH-05** | **High** | **VERIFIED ISSUE** | Shipment lot creation did not check cumulative allocated batch mass across multiple lots | **RESOLVED (`v1.1` / `BL-049`)** | `ShipmentService.createShipmentLot` now sums `orderedKg` across all non-void shipment lots for `batch._id` and enforces `<= remainingBatchKg`. |
 | **HIGH-06** | **High** | **VERIFIED ISSUE** | `Batch.totalInputKg` and `Batch.totalFilledKg` accumulated on every stage step | **RESOLVED (`v1.1` / `BL-049`)** | `ProcessService.executeStage` now records initial stage input in `totalInputKg` and latest stage output in `totalFilledKg`. |
-| **HIGH-07** | **High** | **POTENTIAL RISK** | NoSQL query operator injection in filter parameters & missing login rate limiting | **PARTIALLY RESOLVED (`v1.1`)** | Added `queryString(...)` sanitization in `stock.controller.ts` and `shipment.service.ts`. Login rate limiting (`express-rate-limit` or Redis limiter) remains optional Phase 4 work. |
+| **HIGH-07** | **High** | **POTENTIAL RISK** | NoSQL query operator injection in filter parameters & missing login rate limiting | **RESOLVED (`v1.1` & `v1.2` / `BL-050`)** | Added `queryString(...)` sanitization in `stock.controller.ts` & `shipment.service.ts` (`v1.1`) and `loginRateLimiter` / `passwordChangeRateLimiter` in `auth.routes.ts` (`v1.2`). |
 | **HIGH-08** | **High** | **VERIFIED ISSUE** | `MasterDataWorkspace` failed to load materials for non-Admin roles when `/master/counters` returned 403 | **RESOLVED (`v1.1` / `BL-049`)** | `MasterDataWorkspace.tsx` now catches `/master/counters` 403 errors gracefully and falls back to `[]`. |
 | **MED-01** | **Medium** | **VERIFIED ISSUE** | Zod vs. Mongoose schema drift on `QualityGrade` and `ExportLog` sort field | **RESOLVED (`v1.1` / `BL-049`)** | Updated `UpsertQualityGradeSchema` in `shared/src/schemas/master.ts` and changed `ExportService.listExportLogs` sort to `{ createdAt: -1 }`. |
-| **MED-02** | **Medium** | **VERIFIED ISSUE** | Unused Redis container and `ioredis` dependency in `docker-compose.yml` / `server/package.json` | **OPEN (Phase 4)** | Either wire Redis for login rate-limiting / session cache or remove unused container/dependency. |
-| **MED-03** | **Medium** | **POTENTIAL RISK** | Dual JWT storage (`sessionStorage` + `httpOnly` cookie) in `LandingWithLoginPage.tsx` and `apiClient.ts` | **OPEN (Phase 4)** | Evaluate relying solely on the `httpOnly` cookie (`credentials: 'include'`) and removing `sessionStorage.setItem('buram_jwt', ...)`. |
+| **MED-02** | **Medium** | **VERIFIED ISSUE** | Unused Redis dependency on `server` service in `docker-compose.yml` | **RESOLVED (`v1.2` / `BL-050`)** | Removed unnecessary `redis` startup dependency from `server` in `docker-compose.yml` (retaining `redis` for `nextcloud`). |
+| **MED-03** | **Medium** | **POTENTIAL RISK** | Dual JWT storage (`sessionStorage` + `httpOnly` cookie) in `LandingWithLoginPage.tsx` and `apiClient.ts` | **RESOLVED (`v1.2` / `BL-050`)** | Replaced persistent `window.sessionStorage.setItem('buram_jwt', ...)` with in-memory `apiClient.setBearerToken(...)` backed by the `httpOnly` cookie. |
 | **MED-04** | **Medium** | **POTENTIAL RISK** | Raw 500 error messages returned to clients in production in `error.middleware.ts` | **RESOLVED (`v1.1` / `BL-049`)** | `errorHandler` now returns a generic message when `statusCode === 500` and `env.NODE_ENV === 'production'`. |
-| **MED-05** | **Medium** | **POTENTIAL RISK** | Unbounded collection queries (`find({})` without `.limit()`) in `sourcing`, `stock`, `batch`, and `shipment` services | **OPEN (Phase 4)** | Add `.limit()` / cursor pagination parameters to list endpoints as dataset volume grows. |
-| **MED-06** | **Medium** | **POTENTIAL RISK** | Sequential per-file WebDAV `statFile` in `IntegrityJobService.verifyAttachmentStorageIntegrity` | **OPEN (Phase 4)** | Batch WebDAV `statFile` checks with bounded concurrency (e.g., chunks of 5–10). |
+| **MED-05** | **Medium** | **POTENTIAL RISK** | Unbounded collection queries (`find({})` without `.limit()`) in `sourcing`, `stock`, `batch`, and `shipment` services | **RESOLVED (`v1.2` / `BL-050`)** | Added `.limit(500)` bounds on `IncomingLotModel` and `PriceModel` queries in `stock.service.ts` and `sourcing.service.ts`. |
+| **MED-06** | **Medium** | **POTENTIAL RISK** | Sequential per-file WebDAV `statFile` in `AttachmentService.verifyStorageIntegrity` | **RESOLVED (`v1.2` / `BL-050`)** | Updated `AttachmentService.verifyStorageIntegrity` to process WebDAV `statObject` checks in bounded concurrent batches of 8. |
 | **LOW-01** | **Low** | **POTENTIAL RISK** | Append-only Mongoose pre-hooks on `StockMovement` omitted `updateOne`/`updateMany` | **RESOLVED (`v1.1` / `BL-049`)** | Added `updateOne`, `updateMany`, `findOneAndUpdate`, and `replaceOne` pre-hooks to `StockMovementSchema`. |
-| **LOW-02** | **Low** | **POTENTIAL RISK** | Single 603 kB client bundle chunk in Vite production build | **OPEN (Phase 4)** | Code-split workspaces in `App.tsx` using `React.lazy` and `Suspense`. |
+| **LOW-02** | **Low** | **POTENTIAL RISK** | Single 603 kB client bundle chunk in Vite production build | **RESOLVED (`v1.2` / `BL-050`)** | Configured `manualChunks` (`vendor` and `scanner`) in `client/vite.config.ts` to separate `@zxing/*` and `tesseract.js` from the main bundle. |
 
 ---
 

@@ -123,7 +123,9 @@ export class AttachmentService {
   ) {
     const query: Record<string, unknown> = {};
     if (filters.entityType) query.entityType = filters.entityType;
-    if (filters.entityId && mongoose.isValidObjectId(filters.entityId)) query.entityId = new mongoose.Types.ObjectId(filters.entityId);
+    if (filters.entityId && mongoose.isValidObjectId(filters.entityId)) {
+      query.entityId = new mongoose.Types.ObjectId(filters.entityId);
+    }
     if (filters.entityCode) query.entityCode = String(filters.entityCode);
     if (filters.docType) query.docType = filters.docType;
     if (!filters.includeVoid) query.status = 'ACTIVE';
@@ -223,6 +225,7 @@ export class AttachmentService {
 
   /**
    * Storage-vs-DB Integrity Job: verifies every ACTIVE Attachment in MongoDB exists on storage
+   * using bounded concurrency (batches of 8) to avoid sequential WebDAV latency bottlenecks.
    */
   static async verifyStorageIntegrity() {
     const storage = getStorageProvider();
@@ -237,42 +240,48 @@ export class AttachmentService {
       issue: string;
     }> = [];
 
-    for (const att of activeAttachments) {
-      const pathStr = (att as any).storage?.path;
-      if (!pathStr) {
-        missingOrMismatch.push({
-          attachmentId: String(att._id),
-          originalName: (att as any).originalName,
-          storagePath: '',
-          expectedBytes: (att as any).sizeBytes || 0,
-          issue: 'Missing storage.path in DB document',
-        });
-        continue;
-      }
+    const CONCURRENCY_LIMIT = 8;
+    for (let i = 0; i < activeAttachments.length; i += CONCURRENCY_LIMIT) {
+      const batch = activeAttachments.slice(i, i + CONCURRENCY_LIMIT);
+      await Promise.all(
+        batch.map(async (att) => {
+          const pathStr = (att as any).storage?.path;
+          if (!pathStr) {
+            missingOrMismatch.push({
+              attachmentId: String(att._id),
+              originalName: (att as any).originalName,
+              storagePath: '',
+              expectedBytes: (att as any).sizeBytes || 0,
+              issue: 'Missing storage.path in DB document',
+            });
+            return;
+          }
 
-      const stat = await storage.statObject(pathStr);
-      if (!stat.exists) {
-        missingOrMismatch.push({
-          attachmentId: String(att._id),
-          originalName: (att as any).originalName,
-          storagePath: pathStr,
-          expectedBytes: (att as any).sizeBytes || 0,
-          issue: 'File missing in storage provider',
-        });
-      } else if (
-        stat.sizeBytes !== undefined &&
-        (att as any).sizeBytes !== undefined &&
-        stat.sizeBytes !== (att as any).sizeBytes
-      ) {
-        missingOrMismatch.push({
-          attachmentId: String(att._id),
-          originalName: (att as any).originalName,
-          storagePath: pathStr,
-          expectedBytes: (att as any).sizeBytes,
-          actualBytes: stat.sizeBytes,
-          issue: 'File byte size mismatch between DB and storage',
-        });
-      }
+          const stat = await storage.statObject(pathStr);
+          if (!stat.exists) {
+            missingOrMismatch.push({
+              attachmentId: String(att._id),
+              originalName: (att as any).originalName,
+              storagePath: pathStr,
+              expectedBytes: (att as any).sizeBytes || 0,
+              issue: 'File missing in storage provider',
+            });
+          } else if (
+            stat.sizeBytes !== undefined &&
+            (att as any).sizeBytes !== undefined &&
+            stat.sizeBytes !== (att as any).sizeBytes
+          ) {
+            missingOrMismatch.push({
+              attachmentId: String(att._id),
+              originalName: (att as any).originalName,
+              storagePath: pathStr,
+              expectedBytes: (att as any).sizeBytes,
+              actualBytes: stat.sizeBytes,
+              issue: 'File byte size mismatch between DB and storage',
+            });
+          }
+        })
+      );
     }
 
     return {
