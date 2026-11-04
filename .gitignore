@@ -1,5 +1,37 @@
-node_modules
+# Dependencies
+node_modules/
+.vscode
+# Uploads and generated files
 uploads/
 dist/
+build/
+.next/
+coverage/
+
+# Environment variables and secrets
 .env
-.kilo
+.env.*
+!.env.example
+
+# Kilo Code
+.kilo/
+
+# Logs
+*.log
+logs/
+
+# Local databases and backups
+*.dump
+*.bak
+
+# IDE and editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# VS?Code workspace settings – keep local only
+.vscode/
