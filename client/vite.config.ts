@@ -15,9 +15,13 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+        // manualChunks: {
+        //   vendor: ['react', 'react-dom', 'lucide-react'],
+        //   scanner: ['@zxing/browser', '@zxing/library', 'tesseract.js'],
+        // },
         manualChunks: {
           vendor: ['react', 'react-dom', 'lucide-react'],
-          scanner: ['@zxing/browser', '@zxing/library', 'tesseract.js'],
+          scanner: ['@zxing/browser', 'tesseract.js'], // Removed '@zxing/library' from the scanner chunk
         },
       },
     },
