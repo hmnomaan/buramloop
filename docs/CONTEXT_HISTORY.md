@@ -726,6 +726,7 @@ and [roadmap](./ROADMAP.md) for active status.*
   - **In-Memory / Cookie-Backed Token Handling (`MED-03`):** Updated `client/src/lib/apiClient.ts`, `LandingWithLoginPage.tsx`, and `App.tsx` to store the bearer token in memory (`apiClient.setBearerToken(...)`) rather than persisting raw JWTs in `window.sessionStorage`.
   - **Bounded Queries & Parallel Storage Integrity (`MED-05`, `MED-06`):** Added `.limit(500)` bounds on `IncomingLotModel` and `PriceModel` queries in `stock.service.ts` and `sourcing.service.ts`, and updated `AttachmentService.verifyStorageIntegrity` to check WebDAV files in concurrent batches of 8.
   - **Vite Bundle Chunk Splitting (`LOW-02`):** Added `manualChunks` (`vendor` and `scanner`) in `client/vite.config.ts`.
+  - **Master Data 5-Tab CRUD Workspace (`HIGH-08`):** Expanded `client/src/pages/MasterDataWorkspace.tsx` from Materials + read-only Counters to 5 interactive tabs (`Materials`, `Customers` with 1–3 allowed/blocked countries, `Suppliers`, `Quality Grades`, and `Counters` with Admin sequence override).
 - Validation passed: `tsc --noEmit` across `shared`, `server`, and `client` (0 errors) and 11 server unit test suites (48 tests). See [BL-050](./ISSUES_AND_FIXES.md#resolved) and [TECHNICAL_AUDIT_REPORT.md](./TECHNICAL_AUDIT_REPORT.md) (`v1.2`).
 
 
