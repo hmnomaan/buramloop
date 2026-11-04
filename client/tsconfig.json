@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],    
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true, // Enable interoperability with ES modules
+    "skipLibCheck": true, // Skip type checking of declaration files
+    "allowImportingTsExtensions": true,
+    "forceConsistentCasingInFileNames": true, // Enforce consistent casing in file names
+    "types": ["vite/client"], // Include Vite types for development
+    "noEmit": true, // Do not emit output files, only perform type checking
+    "resolveJsonModule": true, // Allow importing JSON files
+    "isolatedModules": true, // Enable isolated modules for better type checking
+  },
+  "include": ["src/**/*", "../shared/src/**/*"] // Include shared source files for type checking
+}

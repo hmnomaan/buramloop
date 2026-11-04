@@ -1,0 +1,11 @@
+packages:
+  - 'shared'
+  - 'server'
+  - 'client'
+allowBuilds:
+  '@parcel/watcher': false
+  argon2: true
+  esbuild: false
+  mongodb-memory-server: false
+  tesseract.js: false
+  unrs-resolver: false

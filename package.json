@@ -1,0 +1,21 @@
+{
+  "name": "buramloop",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@12.15.0",
+  "scripts": {
+    "build": "pnpm --filter @buramloop/shared build && pnpm --filter @buramloop/server build && pnpm --filter @buramloop/client build",
+    "typecheck": "pnpm --filter @buramloop/shared typecheck && pnpm --filter @buramloop/server typecheck && pnpm --filter @buramloop/client typecheck",
+    "test": "pnpm --filter @buramloop/server test",
+    "seed": "pnpm --filter @buramloop/server seed",
+    "dev": "pnpm --parallel --filter @buramloop/client --filter @buramloop/server dev",
+    "dev:server": "pnpm --filter @buramloop/server dev",
+    "dev:client": "pnpm --filter @buramloop/client dev",
+    "docker:up": "docker compose up -d",
+    "docker:build": "docker compose up -d --build",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

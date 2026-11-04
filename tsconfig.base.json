@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "node16",
+    "moduleResolution": "Node16",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true, // Enforce consistent casing in file names
+    "resolveJsonModule": true, // Allow importing JSON files 
+    "declaration": true, // Generate declaration files for TypeScript   
+    "sourceMap" : true, // Enable source maps for debugging
+    "outDir": "./dist", // Output directory for compiled files
+    "rootDir": "./src", // Root directory of source files
+  }
+}

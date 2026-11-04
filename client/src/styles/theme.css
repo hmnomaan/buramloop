@@ -1,0 +1,84 @@
+/* client/src/styles/theme.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --color-bg: 11 18 32;
+  --color-surface: 19 30 46;
+  --color-elevated: 27 41 58;
+  --color-border: 38 56 78;
+  --color-amber: 245 166 35;
+  --color-gold: 255 209 102;
+  --color-pale: 255 240 179;
+  --color-text: 244 247 251;
+  --color-ink: 11 18 32;
+  --color-muted: 168 180 197;
+  --color-success: 53 201 138;
+  --color-warning: 255 181 71;
+  --color-critical: 255 93 104;
+  --color-tech: 87 199 255;
+  --shadow-panel: 0 4px 20px -2px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+  --shadow-amber: 0 0 16px -4px rgba(245, 166, 35, 0.35);
+  --shadow-tech: 0 0 14px -4px rgba(87, 199, 255, 0.3);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --color-bg: 248 250 246;
+  --color-surface: 255 255 255;
+  --color-elevated: 238 244 238;
+  --color-border: 213 226 214;
+  --color-amber: 217 169 0;
+  --color-gold: 169 121 0;
+  --color-pale: 128 96 0;
+  --color-text: 24 51 35;
+  --color-ink: 24 51 35;
+  --color-muted: 97 115 102;
+  --color-success: 23 107 58;
+  --color-warning: 148 98 0;
+  --color-critical: 180 35 50;
+  --color-tech: 39 115 75;
+  --shadow-panel: 0 4px 18px -5px rgba(24, 51, 35, 0.16), inset 0 1px 0 0 rgba(255, 255, 255, 0.85);
+  --shadow-amber: 0 0 16px -4px rgba(217, 169, 0, 0.28);
+  --shadow-tech: 0 0 14px -4px rgba(39, 115, 75, 0.2);
+}
+
+body {
+  background-color: rgb(var(--color-bg));
+  color: rgb(var(--color-text));
+  font-family: Inter, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* Enforce tabular numerals for all operational measurements */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle honeycomb motif restricted to headers and empty states */
+.bg-honeycomb-header {
+  background-image: radial-gradient(rgb(var(--color-amber) / 0.1) 1px, transparent 1px),
+    radial-gradient(rgb(var(--color-tech) / 0.06) 1px, rgb(var(--color-surface)) 1px);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
+}
+
+/* Accessible focus ring for factory keyboard navigation */
+*:focus-visible {
+  outline: 2px solid rgb(var(--color-success));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

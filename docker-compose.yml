@@ -1,0 +1,119 @@
+# docker-compose.yml
+# version: '3.9'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: buramloop_mongo
+    restart: unless-stopped
+    command: [ "--replSet", "rs0", "--bind_ip_all", "--port", "27017" ]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --port 27017 --quiet --eval 'try {
+          const cfg = rs.conf();
+          if (cfg.members[0].host !== "mongodb:27017") {
+          cfg.members[0].host = "mongodb:27017";
+          rs.reconfig(cfg, { force: true });
+          }
+          rs.status().ok;
+          } catch (error) {
+          rs.initiate({_id: "rs0", members: [{_id: 0, host: "mongodb:27017"}]});
+          }' | grep -q 1
+      interval: 5s
+      timeout: 30s
+      start_period: 5s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    container_name: buramloop_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  nextcloud_db:
+    image: mariadb:10.11
+    container_name: buramloop_nc_db
+    restart: unless-stopped
+    command: --transaction-isolation=READ-COMMITTED --log-bin=binlog --binlog-format=ROW
+    environment:
+      MYSQL_ROOT_PASSWORD: nc_root_dev_password
+      MYSQL_PASSWORD: nc_app_dev_password
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+    volumes:
+      - nc_db_data:/var/lib/mysql
+
+  nextcloud:
+    image: nextcloud:29-apache
+    container_name: buramloop_nextcloud
+    restart: unless-stopped
+    depends_on:
+      - nextcloud_db
+      - redis
+    ports:
+      - "8080:80"
+    environment:
+      MYSQL_HOST: nextcloud_db
+      MYSQL_DATABASE: nextcloud
+      MYSQL_USER: nextcloud
+      MYSQL_PASSWORD: nc_app_dev_password
+      REDIS_HOST: redis
+      NEXTCLOUD_ADMIN_USER: buram_service
+      NEXTCLOUD_ADMIN_PASSWORD: buram_nc_dev_password_2026
+      NEXTCLOUD_TRUSTED_DOMAINS: "localhost 127.0.0.1 host.docker.internal"
+    volumes:
+      - nc_data:/var/www/html
+
+
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: buramloop_server
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      MONGO_URI: mongodb://mongodb:27017/buramloop?replicaSet=rs0
+      JWT_SECRET: ${JWT_SECRET:-buramloop_prod_secret_key_change_me_2026}
+      CORS_ORIGIN: http://localhost:3000
+      STORAGE_PROVIDER: nextcloud
+      NC_URL: http://nextcloud:80
+      NC_USER: buram_service
+      NC_APP_PASSWORD: buram_nc_dev_password_2026
+      NC_ROOT: BuramLoop
+    ports:
+      - "4000:4000"
+
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    container_name: buramloop_client
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "3000:80"
+
+volumes:
+  mongo_data:
+  redis_data:
+  nc_db_data:
+  nc_data:
