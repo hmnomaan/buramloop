@@ -529,6 +529,10 @@ check.
 - **Issues/fixes:** [BL-052](./ISSUES_AND_FIXES.md#resolved), [BL-053](./ISSUES_AND_FIXES.md#resolved).
 - **Validation:** `tsc --noEmit` on client and server passed (0 errors); client `vite build` passed in 7.29s; all 14 server Jest suites (52 tests, including `MongoMemoryReplSet` E2E workflows) passed.
 
+- Recorded architectural specification for **R15 Dual Graph Inspection Trace** in `docs/BURAMLOOP_CONTEXT.md` and `docs/CONTEXT_HISTORY.md` (`ctx-v68`):
+  - **Admin View:** Full end-to-end graph: `Product ↔ Batch ↔ Events ↔ Facilities ↔ Suppliers ↔ Customers` (full transparency, facility nodes, financial/price data, and audit records).
+  - **Government View:** Masked regulatory graph: `Product ↔ Batch ↔ Events (Ins/Outs only)` (honey source country only, QSI lab results, in-house lab test results, zero price/cost data, official compliance contact details).
+
 ## Daily entry template
 
 ## YYYY-MM-DD

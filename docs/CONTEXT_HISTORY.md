@@ -775,6 +775,13 @@ and [roadmap](./ROADMAP.md) for active status.*
   - Added Web App Manifest with standalone display, dark/amber theme colors, and mobile icons.
 - Validation passed: `tsc --noEmit` on client and server passed (0 errors); client Vite build passed; all 14 server Jest suites (52 tests, including `MongoMemoryReplSet` E2E workflows) passed.
 
+## ctx-v68 — Architectural Decision: Dual Graph Inspection Trace (2026-11-05)
+
+- Recorded foundational domain rule **R15** for dual-mode inspection trace:
+  - **Admin View (Full Graph):** Complete multi-tier provenance graph connecting `Product ↔ Batch ↔ Events ↔ Facilities ↔ Suppliers ↔ Customers`. Provides full internal transparency, supplier provenance, customer shipments, storage/processing facilities, cost/pricing margins, and immutable audit logs.
+  - **Government View (Masked Graph):** Regulatory compliance graph connecting `Product ↔ Batch ↔ Events (Ins/Outs only)`. Displays honey source country ONLY with commercial supplier names and purchase contracts redacted. Includes complete QSI (Quality Services International) lab results and in-house lab analysis. Strictly masks all commercial prices and margins. Includes official compliance contact information.
+- Documented in `docs/BURAMLOOP_CONTEXT.md`, `docs/DAILY_LOG.md`, and `docs/CONTEXT_HISTORY.md`.
+
 ## RULES  for  BURAMLOOP AI DEVELOPMENT
 
 1. Inspect existing code before proposing changes.
