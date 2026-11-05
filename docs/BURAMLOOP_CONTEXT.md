@@ -109,3 +109,8 @@ than displayed inline on screen headers and labels:
 - **R15 — Inspection Trace Dual Graph (Admin vs. Government):**
   - **Admin View (Full Graph):** Full multi-tier graph: `Product ↔ Batch ↔ Events ↔ Facilities ↔ Suppliers ↔ Customers`. Full transparency for admin operations, root-cause investigations, supplier/customer traceability, cost/price breakdowns, and complete audit trail.
   - **Govt View (Masked Graph):** Regulatory compliance graph: `Product ↔ Batch ↔ Events (Ins/Outs only)`. Honey source country ONLY (commercial supplier identities, supplier leads, and purchasing contracts redacted). Full lab verification: QSI (Quality Services International) lab results and in-house lab test results. Strictly NO price or commercial financial data. Official compliance contact details included.
+- **R16 — Decoupled System Governance (Audit, Nextcloud & Exports vs. Traceability):**
+  - **Traceability** is strictly dedicated to the product lifecycle graph (Admin full provenance graph vs. Govt masked regulatory graph).
+  - **Audit, Nextcloud & Exports** is an independent, cross-cutting system governance domain.
+  - **Universal Immutable Audit Trail:** Spans the system end-to-end across every module (`SOURCING`, `INCOMING_QA`, `WAREHOUSE_STOCK`, `WARM_CABINETS`, `BATCH_PLANNING`, `PROCESSING`, `SHIPMENTS`, `MASTER_DATA`, `AUTH`, `STORAGE`, and `EXPORTS`). Every state mutation records immutable actor attribution, CET timestamps, required operator reasons, and before/after change snapshots.
+  - **Nextcloud & Compliance Exports:** Handles tamper-proof document archiving (QSI certificates, intake photos, batch log sheets) and compliance data dumps independently of product trace visualizers.

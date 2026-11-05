@@ -533,6 +533,11 @@ check.
   - **Admin View:** Full end-to-end graph: `Product ↔ Batch ↔ Events ↔ Facilities ↔ Suppliers ↔ Customers` (full transparency, facility nodes, financial/price data, and audit records).
   - **Government View:** Masked regulatory graph: `Product ↔ Batch ↔ Events (Ins/Outs only)` (honey source country only, QSI lab results, in-house lab test results, zero price/cost data, official compliance contact details).
 
+- Recorded architectural clarification decoupling **Audit, Nextcloud & Exports** from **Traceability** (**R16**, `ctx-v69`):
+  - **Product Traceability:** Confined to the product lifecycle graph (Admin full graph vs. Government masked graph).
+  - **System Audit & Exports:** Independent universal domain. Immutable audit log spans the entire ERP platform end-to-end across all operational modules with before/after state diffs and operator attribution.
+  - Documented in `docs/BURAMLOOP_CONTEXT.md`, `docs/CONTEXT_HISTORY.md`, and `docs/DAILY_LOG.md`.
+
 ## Daily entry template
 
 ## YYYY-MM-DD

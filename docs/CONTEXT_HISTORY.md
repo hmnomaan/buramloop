@@ -782,6 +782,13 @@ and [roadmap](./ROADMAP.md) for active status.*
   - **Government View (Masked Graph):** Regulatory compliance graph connecting `Product ↔ Batch ↔ Events (Ins/Outs only)`. Displays honey source country ONLY with commercial supplier names and purchase contracts redacted. Includes complete QSI (Quality Services International) lab results and in-house lab analysis. Strictly masks all commercial prices and margins. Includes official compliance contact information.
 - Documented in `docs/BURAMLOOP_CONTEXT.md`, `docs/DAILY_LOG.md`, and `docs/CONTEXT_HISTORY.md`.
 
+## ctx-v69 — Architectural Clarification: System-Wide Audit & Exports Decoupled from Trace (2026-11-05)
+
+- Clarified architectural boundary between Product Traceability and Universal System Governance (**R16**):
+  - **Traceability:** Focused exclusively on the physical and chemical product journey (Admin full graph vs. Government masked graph).
+  - **Audit, Nextcloud & Exports:** Decoupled into its own independent domain. The **Immutable Audit Log** is a universal system-wide ledger operating end-to-end across all modules (`SOURCING`, `STOCK`, `WARM_ROOM`, `BATCH`, `PROCESS`, `SHIPMENTS`, `MASTER`, `AUTH`, `STORAGE`). Every operational mutation captures before/after state diffs, operator attribution, CET timestamps, and audit reasons. Nextcloud storage sync and compliance data exports operate independently from product graph visualizers.
+- Updated `docs/BURAMLOOP_CONTEXT.md`, `docs/DAILY_LOG.md`, and `docs/CONTEXT_HISTORY.md`.
+
 ## RULES  for  BURAMLOOP AI DEVELOPMENT
 
 1. Inspect existing code before proposing changes.
