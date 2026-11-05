@@ -1,3 +1,4 @@
+﻿import { DetailModal } from '../components/ui/DetailModal';
 // client/src/pages/OperationsDashboard.tsx
 import React, { useState } from 'react';
 import {
@@ -111,6 +112,7 @@ export const OperationsDashboard: React.FC<{
     reason: string
   ) => Promise<void>;
   onApproveExternalAnalysis: (offerId: string, reason: string) => Promise<void>;
+  onAcknowledgeNotification?: (notificationId: string) => Promise<void> | void;
 }> = ({
   user,
   lots,
@@ -127,9 +129,12 @@ export const OperationsDashboard: React.FC<{
   onOpenMobileScanner,
   onCabinetAction,
   onApproveExternalAnalysis,
+  onAcknowledgeNotification,
 }) => {
   const [selectedCabinet, setSelectedCabinet] = useState<'CABINET_A' | 'CABINET_B'>('CABINET_A');
   const [selectedSlot, setSelectedSlot] = useState<WarmCabinetSlot | null>(null);
+  const [inspectingOffer, setInspectingOffer] = useState<SourcingOffer | null>(null);
+  const [inspectingMovement, setInspectingMovement] = useState<StockMovementEntry | null>(null);
   const [pendingAction, setPendingAction] = useState<{
     type: 'CABINET_OUT' | 'SOURCING_APPROVE';
     title: string;
@@ -290,7 +295,7 @@ export const OperationsDashboard: React.FC<{
 
         <KpiCard
           code="CAB-OCCUPANCY"
-          title="Warm Cabinets (2×17)"
+          title="Warm Cabinets (2Ã—17)"
           primaryValue={`${occupiedSlots} / 34 Drums`}
           subtitle="Warming Conditioning"
           statusLabel={cabinetSlots.length === 34 ? `${ready48hSlots} READY` : 'NO TELEMETRY'}
@@ -316,7 +321,7 @@ export const OperationsDashboard: React.FC<{
           code="PRC-EXEC"
           title="Active Processes"
           primaryValue={`${activeProcessesCount} Active`}
-          subtitle="Filter → Blend → Fill"
+          subtitle="Filter â†’ Blend â†’ Fill"
           statusLabel={activeProcessesCount > 0 ? 'IN PROGRESS' : 'IDLE'}
           statusVariant={activeProcessesCount > 0 ? 'TECHNICAL' : 'MUTED'}
           footerMetric={`${activeProcessesCount} Running`}
@@ -345,7 +350,7 @@ export const OperationsDashboard: React.FC<{
               <div className="flex items-center gap-2">
                 <Flame className="w-4 h-4 text-buram-amber" />
                 <h2 id="warm-cabinet-heading" className="text-base font-semibold text-buram-text">
-                  Warm Cabinets (2 × 17)
+                  Warm Cabinets (2 Ã— 17)
                 </h2>
               </div>
             </div>
@@ -421,7 +426,7 @@ export const OperationsDashboard: React.FC<{
                       </div>
                       <div className="mt-1 flex items-center justify-between text-[10px] text-buram-muted tabular-nums">
                         <span>{slot.netKg ?? 290}kg</span>
-                        <span>{slot.currentTempC ? `${slot.currentTempC.toFixed(1)}°C` : '—'}</span>
+                        <span>{slot.currentTempC ? `${slot.currentTempC.toFixed(1)}Â°C` : 'â€”'}</span>
                       </div>
                     </>
                   )}
@@ -436,7 +441,7 @@ export const OperationsDashboard: React.FC<{
               <div className="space-y-1 text-xs">
                 <div className="flex items-center gap-2 font-mono">
                   <span className="font-bold text-buram-gold">{selectedSlot.slotCode}</span>
-                  <span>•</span>
+                  <span>â€¢</span>
                   <StatusBadge
                     label={selectedSlot.state}
                     variant={
@@ -528,7 +533,7 @@ export const OperationsDashboard: React.FC<{
                       />
                     </div>
                     <div className="text-xs text-buram-text mt-1">
-                      {offer.supplierName} • {offer.honeyVariety} •{' '}
+                      {offer.supplierName} â€¢ {offer.honeyVariety} â€¢{' '}
                       <KgDisplay kg={offer.offeredKg} showDrumEquivalent />
                     </div>
                   </div>
@@ -540,7 +545,7 @@ export const OperationsDashboard: React.FC<{
                       onClick={() =>
                         setPendingAction({
                           type: 'SOURCING_APPROVE',
-                          title: `Approve External Analysis Gate — ${offer.referenceCode}`,
+                          title: `Approve External Analysis Gate â€” ${offer.referenceCode}`,
                           summary: `Management gate sign-off (management:approve) for ${offer.supplierName} (${offer.offeredKg} kg ${offer.honeyVariety}) to advance to SAMPLE stage.`,
                           payload: offer.id,
                         })
@@ -577,7 +582,7 @@ export const OperationsDashboard: React.FC<{
             <div className="mt-3 space-y-2">
               {notifications.length === 0 && (
                 <p className="rounded border border-buram-border bg-buram-bg/60 p-3 text-xs text-buram-muted">
-                  No notification feed is connected to this dashboard yet.
+                  No active notifications or alerts for your role.
                 </p>
               )}
               {notifications.map((n) => (
@@ -598,6 +603,17 @@ export const OperationsDashboard: React.FC<{
                     </span>
                   </div>
                   <p className="text-buram-muted">{n.message}</p>
+                  {onAcknowledgeNotification && !n.acknowledged && (
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => void onAcknowledgeNotification(n.id)}
+                        className="rounded border border-buram-border bg-buram-elevated px-2 py-0.5 text-[10px] font-mono uppercase text-buram-pale hover:border-buram-amber"
+                      >
+                        Acknowledge
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -683,14 +699,14 @@ export const OperationsDashboard: React.FC<{
                 <th className="py-2.5 px-3">Drum Code</th>
                 <th className="py-2.5 px-3">Lot #</th>
                 <th className="py-2.5 px-3 text-right">Delta (kg)</th>
-                <th className="py-2.5 px-3 text-right">Lot Balance (kg)</th>
+                <th className="py-2.5 px-3 text-right">Lot Net, recent window (kg)</th>
                 <th className="py-2.5 px-3">Operator</th>
                 <th className="py-2.5 px-3">Audited Reason</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-buram-border/50">
               {movements.map((m) => (
-                <tr key={m.id} className="hover:bg-buram-elevated/40">
+                <tr key={m.id} onClick={() => setInspectingMovement(m)} className="hover:bg-buram-elevated/70 cursor-pointer transition-colors" title="Click to view full movement details in modal">
                   <td className="py-2.5 px-3 text-buram-muted">
                     {new Date(m.timestamp).toLocaleString('de-DE')}
                   </td>
@@ -727,7 +743,7 @@ export const OperationsDashboard: React.FC<{
               <tbody>
                 <tr>
                   <td colSpan={8} className="py-6 text-center text-xs text-buram-muted">
-                    No stock movements are synchronized to this dashboard yet.
+                    No stock movements recorded yet.
                   </td>
                 </tr>
               </tbody>
@@ -735,6 +751,83 @@ export const OperationsDashboard: React.FC<{
           </table>
         </div>
       </section>
+
+      {/* SOURCING OFFER DETAIL MODAL */}
+      <DetailModal
+        isOpen={Boolean(inspectingOffer)}
+        onClose={() => setInspectingOffer(null)}
+        title={inspectingOffer?.referenceCode ?? 'Sourcing Offer'}
+        subtitle="Sourcing Offer Details"
+        badgeLabel={inspectingOffer?.currentStage}
+        badgeVariant={inspectingOffer?.currentStage === 'EXTERNAL_ANALYSIS' ? 'WARNING' : 'TECHNICAL'}
+        fields={[
+          { label: 'Reference Code', value: inspectingOffer?.referenceCode, isMono: true },
+          { label: 'Supplier', value: inspectingOffer?.supplierName },
+          { label: 'Origin Country', value: inspectingOffer?.originCountryIso, isMono: true },
+          { label: 'Honey Variety', value: inspectingOffer?.honeyVariety },
+          { label: 'Offered Weight', value: `${inspectingOffer?.offeredKg?.toLocaleString('de-DE')} kg`, isMono: true },
+          { label: 'Estimated Drums', value: inspectingOffer?.estimatedDrums, isMono: true },
+          { label: 'Current Stage', value: inspectingOffer?.currentStage, isMono: true },
+          { label: 'Gate Status', value: inspectingOffer?.gateStatus, isMono: true },
+          { label: 'Last Updated', value: inspectingOffer?.updatedAt ? new Date(inspectingOffer.updatedAt).toLocaleString('de-DE') : '—' },
+          { label: 'Updated By', value: inspectingOffer?.updatedBy ?? 'Server' },
+        ]}
+        actions={
+          inspectingOffer?.currentStage === 'EXTERNAL_ANALYSIS' && inspectingOffer?.gateStatus === 'PENDING' && canApproveManagementGate ? (
+            <button
+              type="button"
+              onClick={() => {
+                const target = inspectingOffer;
+                setInspectingOffer(null);
+                setPendingAction({
+                  type: 'SOURCING_APPROVE',
+                  title: `Approve External Analysis Gate — ${target.referenceCode}`,
+                  summary: `Management gate sign-off (management:approve) for ${target.supplierName} (${target.offeredKg} kg ${target.honeyVariety}) to advance to SAMPLE stage.`,
+                  payload: target.id,
+                });
+              }}
+              className="px-3 py-1.5 rounded text-xs font-mono uppercase font-semibold bg-buram-success text-buram-ink hover:bg-buram-success/90"
+            >
+              Approve Gate (Mgmt)
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setInspectingOffer(null)}
+              className="px-3 py-1.5 rounded text-xs font-mono uppercase font-semibold bg-buram-elevated border border-buram-border text-buram-pale hover:border-buram-amber"
+            >
+              Close
+            </button>
+          )
+        }
+      />
+
+      {/* STOCK MOVEMENT DETAIL MODAL */}
+      <DetailModal
+        isOpen={Boolean(inspectingMovement)}
+        onClose={() => setInspectingMovement(null)}
+        title={`Stock Movement: ${inspectingMovement?.movementType ?? ''}`}
+        subtitle="Immutable Audit Ledger Entry"
+        badgeLabel={inspectingMovement?.movementType}
+        badgeVariant={
+          (inspectingMovement?.deltaKg ?? 0) >= 0 ? 'NOMINAL' : 'WARNING'
+        }
+        fields={[
+          { label: 'Movement ID', value: inspectingMovement?.id, isMono: true },
+          { label: 'Timestamp (CET)', value: inspectingMovement ? new Date(inspectingMovement.timestamp).toLocaleString('de-DE') : '—' },
+          { label: 'Movement Type', value: inspectingMovement?.movementType, isMono: true },
+          { label: 'Drum Code', value: inspectingMovement?.drumCode, isMono: true },
+          { label: 'Lot Number', value: inspectingMovement?.lotNumber, isMono: true },
+          { label: 'Delta Weight', value: inspectingMovement ? `${inspectingMovement.deltaKg >= 0 ? '+' : ''}${inspectingMovement.deltaKg.toFixed(1)} kg` : '—', isMono: true },
+          { label: 'Lot Net (Recent Window)', value: inspectingMovement ? `${inspectingMovement.balanceAfterKg.toFixed(1)} kg` : '—', isMono: true },
+          { label: 'Performed By', value: inspectingMovement?.performedBy },
+        ]}
+      >
+        <div className="p-3 rounded-lg bg-buram-elevated/40 border border-buram-border space-y-1">
+          <div className="text-[10px] font-mono uppercase text-buram-muted">Audited Reason</div>
+          <div className="text-xs text-buram-text font-sans">{inspectingMovement?.reason || 'No reason provided.'}</div>
+        </div>
+      </DetailModal>
 
       {/* MANDATORY REASON DIALOG FOR AUDITED ACTIONS */}
       {actionError && (

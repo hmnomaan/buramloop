@@ -31,7 +31,7 @@ symptom, root cause, change, and verification result.
 - `pnpm -r build` and `pnpm --filter @buramloop/server build` pass after
   resolving the batch/process/shipment compiler failures ([BL-014](./ISSUES_AND_FIXES.md#resolved)).
 - The ctx-v57 `pnpm typecheck`, `pnpm build`, and `pnpm test` passed;
-  server tests report 14 suites and 47 tests, including the complete
+- The ctx-v64/ctx-v65 pnpm typecheck, pnpm build, and all 14 server Jest suites (52 tests) pass, including the complete sourcing-to-receipt and receipt-to-trace/export MongoMemoryReplSet workflows.
   sourcing-to-receipt MongoMemoryReplSet workflow, offer normalization,
   contract-price inheritance, receipt-to-shipment/cost/trace coverage, and
   persisted QA release to Warehouse followed by batch feasibility
@@ -72,7 +72,7 @@ symptom, root cause, change, and verification result.
   revocation, and an Admin directory/create-user form (including secondary
   Admin creation) ([BL-027](./ISSUES_AND_FIXES.md#resolved)). They build and
   typecheck, but do not yet have endpoint integration or browser acceptance
-  tests; Admin update/deactivation UI remains open.
+- Account/profile flows now include self-service password change, profile name/avatar upload, a first-login password-change gate, session-token revocation, and an Admin directory with create, update, activate/deactivate, and temporary password reset actions (BL-027, BL-051).
 - Effective Warehouse baseline permissions are applied at login and on
   authenticated API requests; QA approval remains separate. Authentication
   validates JWT subjects before lookup and does not misreport unexpected

@@ -503,9 +503,31 @@ check.
   - Wired `CrossCuttingPanels.tsx` (`ExportMenu` & `AttachmentsPanel`), `SourcingWorkspace.tsx`, `IncomingStockWorkspace.tsx`, `MasterDataWorkspace.tsx`, and `App.tsx` to live backend contracts (including `/api/v1/attachments/health`, deterministic `entityId` fallback and `entityCode` filtering, valid `ATTACHMENT_DOC_TYPES`, real file streaming/upload/void error handling, and required `externalAnalysis` gate payload).
   - Added `validateBody` Zod schemas to mutating routes in `master.routes.ts`, `batch.routes.ts`, `warm-room.routes.ts`, `process.routes.ts`, `cost.routes.ts`, and `export.routes.ts`; bumped `User.tokenVersion` on role/active changes; added `StockMovement` update immutability hooks; deduplicated health routes and restricted `/api/v1/health/full` to `Admin`; masked 500 error messages in production; and deleted 18 zero-byte files plus the duplicate `client/client` directory.
   - Completed Phase 4 security, performance, and UI completeness (`BL-050`): added `loginRateLimiter` and `passwordChangeRateLimiter` in `auth.routes.ts`, removed unused `redis` dependency from `server` in `docker-compose.yml`, replaced `sessionStorage` JWT persistence with in-memory `apiClient.setBearerToken(...)` + `httpOnly` cookie, added `.limit(500)` bounds on `stock.service.ts` and `sourcing.service.ts` queries, batched `AttachmentService.verifyStorageIntegrity` in concurrent chunks of 8, configured `manualChunks` (`vendor`, `scanner`) in `client/vite.config.ts`, and expanded `MasterDataWorkspace.tsx` into a 5-tab CRUD UI (`Materials`, `Customers`, `Suppliers`, `Quality Grades`, and `Counters` override).
-- **Issues/fixes:** [BL-049](./ISSUES_AND_FIXES.md#resolved), [BL-050](./ISSUES_AND_FIXES.md#resolved), tracked in [TECHNICAL_AUDIT_REPORT.md](./TECHNICAL_AUDIT_REPORT.md) (`v1.0` → `v1.2`).
+- Added role-targeted push notification alerts with Web Audio chimes, bottom 2-second auto-fading pop-up toasts with close button, hover-triggered and click-to-pin notification bell dropdown, PWA service worker with Web Push Notification support, and Tailwind entity detail modal dialogs for clickable records ([BL-052](./ISSUES_AND_FIXES.md#resolved)).
+- Added role-targeted push notification alerts with Web Audio chimes, bottom 2-second auto-fading pop-up toasts with close button, hover-triggered notification bell dropdown, and Tailwind entity detail modal dialogs for clickable records ([BL-052](./ISSUES_AND_FIXES.md#resolved)).
 - **Validation:** `tsc --noEmit` across `shared`, `server`, and `client` passed (0 errors); 11 server unit test suites (48 tests) passed. (The 3 `MongoMemoryReplSet` suites require non-sandboxed localhost TCP socket permissions in this environment.)
 - **Open/blockers:** Live MongoDB/Nextcloud deployment and browser acceptance remain open.
+
+## 2026-11-05
+
+- **Completed:** Completed Admin user account governance and live dashboard synchronization (`BL-051`):
+  - Added user account edit, role reassignment, activate/deactivate toggle, and temporary password reset in `UserAndProfileWorkspace.tsx` wired to audited `PUT /api/v1/master/users/:id`.
+  - Updated `MasterService.upsertUser` to support role resolution by name or ObjectId, bump `tokenVersion` on credential/role/status change, and return updated role metadata.
+  - Mounted `PATCH /api/v1/notifications/:id/read` in `notification.routes.ts`.
+  - Synchronized live notifications and stock movements in `App.tsx` and `OperationsDashboard.tsx` with one-click acknowledgement.
+  - Updated `ROADMAP.md` and `PROJECT_TRACKER.md` to reflect current verified capabilities.
+- **Issues/fixes:** [BL-051](./ISSUES_AND_FIXES.md#resolved).
+- **Validation:** `tsc --noEmit` on `shared`, `server`, and `client` passed (0 errors); client `vite build` passed; all 14 server Jest suites (52 tests, including `MongoMemoryReplSet` e2e workflows) passed.
+- **Open/blockers:** Live deployment DB/browser acceptance testing remain open.
+
+- Added header notification bell hover preview + click-to-pin open interaction with outside-click and Escape key dismissal, synthesized audio chimes, bottom 2s auto-fading toasts, and PWA native push notification infrastructure (`client/public/manifest.json`, `client/public/sw.js`) ([BL-052](./ISSUES_AND_FIXES.md#resolved)).
+- Separated Government Inspection Trace from Internal Admin Audit in `TraceabilityAuditWorkspace.tsx` ([BL-053](./ISSUES_AND_FIXES.md#resolved)):
+  - Added tab switcher between **Admin Audit & Data Exports** and **Government Inspection Trace**, defaulting by role.
+  - Implemented multi-parameter audit query filtering on `GET /api/v1/audit` (`module`, `action`, `actorRole`, `entityType`, `startDate`-`endDate`, full-text `search`) with populated actor details.
+  - Added client-side debounced audit filter bar, before/after JSON diff inspection modal, and direct CSV export download (`exportFilteredAuditToCsv`).
+  - Preserved regulatory counterparty redaction and commercial price masking for the Government Trace view.
+- **Issues/fixes:** [BL-052](./ISSUES_AND_FIXES.md#resolved), [BL-053](./ISSUES_AND_FIXES.md#resolved).
+- **Validation:** `tsc --noEmit` on client and server passed (0 errors); client `vite build` passed in 7.29s; all 14 server Jest suites (52 tests, including `MongoMemoryReplSet` E2E workflows) passed.
 
 ## Daily entry template
 

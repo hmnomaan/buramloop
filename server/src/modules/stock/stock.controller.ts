@@ -174,6 +174,8 @@ export class StockController {
 
       const movements = await StockMovementModel.find(filter)
         .populate('performedBy', 'fullName email roleName')
+        .populate('drumId', 'drumCode')
+        .populate('incomingLotId', 'lotNo')
         .sort({ createdAt: -1 })
         .limit(300)
         .lean();

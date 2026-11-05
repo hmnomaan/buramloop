@@ -1,4 +1,4 @@
-// client/src/App.tsx
+﻿// client/src/App.tsx
 import { WarehouseStockLedgerWorkspace } from './pages/WarehouseStockLedgerWorkspace';
 import React, { useEffect, useState, useCallback } from 'react';
 import { AppShell, ModuleKey } from './components/layout/AppShell';
@@ -31,6 +31,8 @@ import { TraceabilityAuditWorkspace } from './pages/TraceabilityAuditWorkspace';
 import { LandingWithLoginPage } from './pages/LandingWithLoginPage';
 import { toUserSession } from './lib/authSession';
 import { UserAndProfileWorkspace } from './pages/UserAndProfileWorkspace';
+import { ToastNotificationPopup, ToastMessage } from './components/ui/ToastNotification';
+import { playNotificationChime, requestDesktopNotificationPermission, showDesktopNotification } from './lib/notificationSound';
 import { MasterDataWorkspace } from './pages/MasterDataWorkspace';
 
 // Derive workspace data types from their component props so App.tsx stays aligned
@@ -383,6 +385,89 @@ function mapBackendIncomingLot(lot: BackendIncomingLot): IncomingLot {
   };
 }
 
+interface BackendNotification {
+  _id: string;
+  type: string;
+  severity?: 'INFO' | 'WARNING' | 'CRITICAL';
+  title: string;
+  message: string;
+  entityType?: string | null;
+  readByUserIds?: string[];
+  acknowledgedAt?: string | null;
+  createdAt: string | Date;
+}
+
+const NOTIFICATION_CATEGORY: Record<string, NotificationItem['category']> = {
+  LOW_STOCK: 'LOW_STOCK',
+  FEASIBILITY_SHORTFALL: 'FEASIBILITY',
+  RESERVATION_EXPIRING: 'FEASIBILITY',
+  WARM_CABINET_READY_24_48H: 'WARMING_READY',
+  WARM_READY: 'WARMING_READY',
+  SCAN_OR_ORIGIN_MISMATCH: 'DEVIATION',
+  DEVIATION_MISMATCH: 'DEVIATION',
+  PROCESS_DEVIATION: 'DEVIATION',
+  QA_GATE_REJECTED: 'GATE_APPROVAL',
+  COST_REPORT_GENERATED: 'GATE_APPROVAL',
+};
+
+function mapBackendNotification(record: BackendNotification, userId: string): NotificationItem {
+  return {
+    id: record._id,
+    severity: record.severity ?? 'WARNING',
+    category: NOTIFICATION_CATEGORY[record.type] ?? 'DEVIATION',
+    title: record.title,
+    message: record.message,
+    entityRef: record.entityType ?? undefined,
+    createdAt: new Date(record.createdAt).toISOString(),
+    acknowledged: (record.readByUserIds ?? []).some((id) => String(id) === userId),
+  };
+}
+
+interface BackendLedgerMovement {
+  _id: string;
+  movementType: string;
+  signedKg: number;
+  reason: string;
+  createdAt: string | Date;
+  drumId?: { drumCode?: string } | string | null;
+  incomingLotId?: { lotNo?: string } | string | null;
+  performedBy?: { fullName?: string; email?: string } | string | null;
+}
+
+function mapBackendLedgerMovements(records: BackendLedgerMovement[]): StockMovementEntry[] {
+  // The API returns the newest 300 movements first. Compute a per-lot running net
+  // (oldest â†’ newest) over that window; it is not a full historical lot balance.
+  const runningByLot = new Map<string, number>();
+  const chronological = [...records].reverse().map((record) => {
+    const drumCode =
+      record.drumId && typeof record.drumId === 'object' ? record.drumId.drumCode ?? 'â€”' : 'â€”';
+    const lotNumber =
+      record.incomingLotId && typeof record.incomingLotId === 'object'
+        ? record.incomingLotId.lotNo ?? 'â€”'
+        : 'â€”';
+    const runningKg =
+      Math.round(((runningByLot.get(lotNumber) ?? 0) + (record.signedKg ?? 0)) * 1000) / 1000;
+    runningByLot.set(lotNumber, runningKg);
+    const performedBy =
+      record.performedBy && typeof record.performedBy === 'object'
+        ? record.performedBy.fullName ?? record.performedBy.email ?? 'System'
+        : 'System';
+    return {
+      id: record._id,
+      timestamp: new Date(record.createdAt).toISOString(),
+      movementType: record.movementType,
+      drumCode,
+      lotNumber,
+      deltaKg: record.signedKg ?? 0,
+      balanceAfterKg: runningKg,
+      performedBy,
+      reason: record.reason,
+      auditRef: record._id,
+    };
+  });
+  return chronological.reverse().slice(0, 25);
+}
+
 export const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
@@ -409,8 +494,8 @@ export const App: React.FC = () => {
   const [cabinetSlots, setCabinetSlots] = useState<WarmCabinetSlot[]>([]);
   const [batches, setBatches] = useState<BatchPlan[]>([]);
   const [sourcingOffers, setSourcingOffers] = useState<SourcingOffer[]>([]);
-  const [movements] = useState<StockMovementEntry[]>([]);
-  const [notifications] = useState<NotificationItem[]>([]);
+  const [movements, setMovements] = useState<StockMovementEntry[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   // Process and shipment state use component-derived types and are synchronized
   // from their mounted API workflows where available.
@@ -426,6 +511,8 @@ export const App: React.FC = () => {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [incomingLotBarcode, setIncomingLotBarcode] = useState('');
   const [scannedLabelData, setScannedLabelData] = useState<ScannedLabelData | null>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const seenNotificationIdsRef = React.useRef<Set<string>>(new Set());
 
   const handleBarcodeCaptured = useCallback((barcode: string) => {
     if (!canReceiveIncomingLots(user)) return;
@@ -451,13 +538,15 @@ export const App: React.FC = () => {
   const synchronizeWithBackend = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [lotsRes, cabRes, batchRes, srcRes, processRes, ncHealth] = await Promise.allSettled([
+      const [lotsRes, cabRes, batchRes, srcRes, processRes, ncHealth, notifRes, ledgerRes] = await Promise.allSettled([
         apiClient.request<BackendIncomingLot[]>('/stock/lots'),
         apiClient.request<BackendCabinet[]>('/warm-room'),
         apiClient.request<BatchPlan[]>('/production/batches'),
         apiClient.request<BackendSourcingRecord[]>('/sourcings'),
         apiClient.request<BackendProcessRecord[]>('/production/process'),
         apiClient.request<{ ok?: boolean; healthy?: boolean }>('/health/storage'),
+        apiClient.request<BackendNotification[]>('/notifications'),
+        apiClient.request<BackendLedgerMovement[]>('/stock/ledger'),
       ]);
 
       let anyConnected = false;
@@ -487,13 +576,19 @@ export const App: React.FC = () => {
       if (ncHealth.status === 'fulfilled') {
         setNextcloudOnline(Boolean(ncHealth.value?.ok || ncHealth.value?.healthy));
       }
+      if (notifRes.status === 'fulfilled' && Array.isArray(notifRes.value)) {
+        setNotifications(notifRes.value.map((record) => mapBackendNotification(record, user.id)));
+      }
+      if (ledgerRes.status === 'fulfilled' && Array.isArray(ledgerRes.value)) {
+        setMovements(mapBackendLedgerMovements(ledgerRes.value));
+      }
 
       setApiOnline(anyConnected);
       setLastSyncIso(new Date().toISOString());
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user.id]);
 
   useEffect(() => {
     let active = true;
@@ -544,10 +639,26 @@ export const App: React.FC = () => {
       console.warn('Server logout request failed; clearing the local session.', error);
     } finally {
       window.sessionStorage.removeItem('buram_jwt');
+      apiClient.setBearerToken(null);
+      setNotifications([]);
+      setMovements([]);
       setIsAuthenticated(false);
       setActiveModule('DASHBOARD');
       setIsScannerOpen(false);
       setIncomingLotBarcode('');
+    }
+  };
+
+  const handleAcknowledgeNotification = async (notificationId: string) => {
+    try {
+      await apiClient.request(`/notifications/${notificationId}/read`, { method: 'PATCH' });
+      setNotifications((previous) =>
+        previous.map((item) =>
+          item.id === notificationId ? { ...item, acknowledged: true } : item
+        )
+      );
+    } catch (error) {
+      console.warn('Notification acknowledgement failed.', error);
     }
   };
 
@@ -620,7 +731,7 @@ export const App: React.FC = () => {
   if (isCheckingSession) {
     return (
       <main className="min-h-screen bg-buram-bg text-buram-muted flex items-center justify-center font-mono">
-        Checking session…
+        Checking sessionâ€¦
       </main>
     );
   }
@@ -673,6 +784,7 @@ export const App: React.FC = () => {
           }}
           onCabinetAction={handleCabinetAction}
           onApproveExternalAnalysis={handleApproveExternalAnalysis}
+          onAcknowledgeNotification={handleAcknowledgeNotification}
         />
       )}
 

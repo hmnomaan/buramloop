@@ -11,7 +11,7 @@ acceptance checks pass. The current handoff prompt is
 - [x] pnpm monorepo has shared TypeScript/Zod, Express/Mongoose API, and
   React/Vite client packages.
 - [x] Workspace `pnpm typecheck` and `pnpm build` pass; latest server tests
-  pass (14 suites, 47 tests), including in-memory replica-set workflows for
+  pass (14 suites, 52 tests), including in-memory replica-set workflows for
   sourcing-to-receipt and receipt-to-trace/export.
 - [x] API has login, cookie/JWT authentication, `/auth/me`, logout, RBAC
   middleware, audited mutations, reason middleware, and mounted feature
@@ -26,7 +26,7 @@ acceptance checks pass. The current handoff prompt is
   backup script, and acceptance script exist.
 
 These are foundation checks, not a declaration that all R1-R16 workflows are
-complete. The server Jest suite has 14 suites and 47 tests at the latest
+complete. The server Jest suite has 14 suites and 52 tests at the latest
 verified run, including receipt-to-trace and sourcing-to-receipt workflows
 against an in-memory MongoDB replica set. Live deployment database, browser,
 and Postman acceptance remain outstanding.
@@ -117,7 +117,7 @@ management and authorization acceptance remains open.**
   only with the authenticated user's account.
 - [ ] Explicitly test an Admin creating another Admin; do not infer this only
   from the existence of an Admin-only user endpoint.
-- [ ] Complete Admin user update/deactivation UI and align all existing master
+- [x] Complete Admin user update/deactivation UI and align all existing master
   user routes to the same validated API contract.
 - [x] Filter sidebar and breadcrumb destinations through a shared UI access
   policy based on session roles and permissions.
@@ -288,11 +288,11 @@ no development credentials, and business owners sign off the workflows.
 - API route files and services exist, but existence is not equivalent to
   tested completion. The previous “all routers/workflows DONE” claim needs
   route-level authorization and workflow test evidence.
-- The barcode service exists but is not mounted in the stock router; the
-  scanner modal is text/hardware-input only and is not wired into the main
-  application.
-- The app has 11 sidebar destinations and a mounted master-data workspace.
-  Warm-room and batch destinations still share a batch-planning component;
+- Barcode lookup (GET /api/v1/stock/barcode/:code) and Zebra ZPL generation (GET /api/v1/stock/drums/:id/zpl-label) are mounted in the stock router. The mobile camera barcode scanner and OCR are integrated with warehouse intake.
+
+
+- The app has 11 distinct sidebar destinations with separated Warm Cabinets and Batch Planning workspaces, a 5-tab Master Data workspace, an Admin user management directory with update/deactivation/password-reset UI, and live notification and stock movement feeds.
+
   Admin costs and trace/audit are API-backed following ctx-v53; the sourcing
   board is API-backed following ctx-v54, while other
   standalone views still need review for static fixtures and offline fallback.

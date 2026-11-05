@@ -124,7 +124,9 @@ export class MasterService {
   ) {
     return withTransaction(async (session) => {
       const actor = req.user!;
-      const role = await RoleModel.findById(payload.roleId).session(session);
+      const role = Types.ObjectId.isValid(payload.roleId)
+        ? await RoleModel.findById(payload.roleId).session(session)
+        : await RoleModel.findOne({ name: payload.roleId }).session(session);
       if (!role) throw AppError.notFound('Role', payload.roleId);
 
       if (payload.id) {
@@ -134,10 +136,10 @@ export class MasterService {
 
         existing.email = payload.email.toLowerCase().trim();
         existing.fullName = payload.fullName.trim();
-        if (String(existing.roleId) !== String(payload.roleId) || (payload.isActive !== undefined && existing.isActive !== payload.isActive)) {
+        if (String(existing.roleId) !== String(role._id) || (payload.isActive !== undefined && existing.isActive !== payload.isActive)) {
           existing.tokenVersion = (existing.tokenVersion ?? 0) + 1;
         }
-        existing.roleId = new Types.ObjectId(payload.roleId);
+        existing.roleId = role._id;
         if (payload.isActive !== undefined) existing.isActive = payload.isActive;
         if (payload.password && payload.password.length < 10) {
           throw AppError.badRequest(
@@ -166,7 +168,14 @@ export class MasterService {
           reason: payload.reason,
           session,
         });
-        return { id: existing._id, email: existing.email, fullName: existing.fullName, isActive: existing.isActive };
+        return {
+          id: existing._id,
+          email: existing.email,
+          fullName: existing.fullName,
+          isActive: existing.isActive,
+          mustChangePassword: existing.mustChangePassword,
+          roleName: role.name,
+        };
       }
 
       if (!payload.password || payload.password.length < 10) {
@@ -180,7 +189,7 @@ export class MasterService {
             email: payload.email.toLowerCase().trim(),
             fullName: payload.fullName.trim(),
             passwordHash,
-            roleId: new Types.ObjectId(payload.roleId),
+            roleId: role._id,
             isActive: payload.isActive ?? true,
             mustChangePassword: true,
             createdBy: actor.userId,

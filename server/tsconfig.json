@@ -6,6 +6,7 @@
         "isolatedModules": true,
         "allowImportingTsExtensions": true,
         "rewriteRelativeImportExtensions": true,
+        "declaration": false,
         "outDir": "./dist",
         "rootDir": ".."
     },

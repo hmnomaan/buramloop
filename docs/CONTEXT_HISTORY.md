@@ -730,6 +730,51 @@ and [roadmap](./ROADMAP.md) for active status.*
 - Validation passed: `tsc --noEmit` across `shared`, `server`, and `client` (0 errors) and 11 server unit test suites (48 tests). See [BL-050](./ISSUES_AND_FIXES.md#resolved) and [TECHNICAL_AUDIT_REPORT.md](./TECHNICAL_AUDIT_REPORT.md) (`v1.2`).
 
 
+## ctx-v65 — Admin user account governance & live dashboard feeds (2026-11-05)
+
+- Completed Admin user management in `client/src/pages/UserAndProfileWorkspace.tsx` (`BL-025`, `BL-027`, `BL-051`):
+  - Added inline management and activation/deactivation controls for directory users.
+  - Implemented audited user account edits (full name, email, role assignment, active/deactivated status, and optional >=10 char temporary password reset) wired to `PUT /api/v1/master/users/:id`.
+  - Updated `MasterService.upsertUser` (`server/src/modules/master/master.service.ts`) to resolve role by either ObjectId or role name string, return populated role names, and ensure `tokenVersion` increments to invalidate active sessions when role, active state, or password changes.
+- Wired live notification and stock ledger feeds in `client/src/App.tsx` and `client/src/pages/OperationsDashboard.tsx` (`BL-031`, `BL-051`):
+  - Added `PATCH /api/v1/notifications/:id/read` alias to `server/src/modules/notification/notification.routes.ts` with user acknowledgement tracking.
+  - Synchronized `GET /api/v1/notifications` and `GET /api/v1/stock/ledger` on initial load and dashboard refresh.
+  - Populated recent stock movement table with live delta, per-lot balance, operator name, and audited reason.
+  - Added one-click notification acknowledgement in the dashboard alerts card.
+- Refreshed documentation in `docs/ROADMAP.md` and `docs/PROJECT_TRACKER.md` reflecting verified 14-suite test baseline, 5-tab Master Data workspace, and mounted barcode/ZPL endpoints.
+- Validation passed: `tsc --noEmit` across `shared`, `server`, and `client` (0 errors), client production build (`vite build`), and all 14 server Jest suites (52 tests, including `MongoMemoryReplSet` E2E suites).
+
+
+## ctx-v66 — Role push notifications, audio alerts & interactive modal inspectors (2026-11-05)
+
+- Implemented synthesized audio chimes and native push notification delivery (`client/src/lib/notificationSound.ts`, `BL-052`):
+  - Added zero-dependency Web Audio API synthesized chimes for `info`, `warning`, and `critical` severity tones without requiring external audio assets.
+  - Integrated native browser Notification API permission requests on session start and automated background push notifications tailored to role-targeted alert streams.
+- Created bottom pop-up toast alerts (`client/src/components/ui/ToastNotification.tsx`, `BL-052`):
+  - Displays incoming notifications at the bottom-right corner for 2 seconds with an automatic fade-out and slide transition.
+  - Includes manual dismiss close button (`X`) and severity styling (critical red, warning amber, info elevated dark).
+- Enhanced Header Notification Bell with mouse-hover preview (`client/src/components/layout/AppShell.tsx`, `BL-052`):
+  - The notification bell now opens an active role-specific alert dropdown immediately on mouse hover, with a test-sound button, direct mark-as-read actions, unread badge counter, and link to Audit Docs.
+- Implemented reusable Tailwind record detail modals (`client/src/components/ui/DetailModal.tsx`, `client/src/pages/OperationsDashboard.tsx`, `BL-052`):
+- Configured industry-standard PWA infrastructure for native device push notifications (`client/public/manifest.json`, `client/public/sw.js`, `index.html`, `BL-052`):
+  - Registered Service Worker with Web Push Notification listener and window focus/open click handler.
+  - Added PWA Web App Manifest with standalone display mode, theme colors, and mobile homescreen compatibility.
+## ctx-v67 — Notification Hover & Pin, Native PWA Push, Admin Audit Advanced Filtering & CSV Export vs Govt Trace Separation (2026-11-05)
+
+- Differentiated Government Inspection Trace from Internal Admin Audit in `client/src/pages/TraceabilityAuditWorkspace.tsx` (`BL-053`):
+  - Created two distinct tabbed workspaces: **Admin Audit & Data Exports** (for internal compliance, full event history, before/after diffs, and filtered data dumps) and **Government Inspection Trace** (for regulatory audits with counterparty commercial redaction).
+  - Preserved existing Government trace contract pending user regulatory/API decisions.
+- Advanced Admin Audit query filtering and CSV export (`server/src/modules/audit/audit.routes.ts`, `client/src/pages/TraceabilityAuditWorkspace.tsx`, `BL-053`):
+  - Enhanced `GET /api/v1/audit` endpoint with multi-parameter filtering: `module`, `action`, `actorRole`, `entityType`, `entityRef` regex, `actorId`, `startDate` & `endDate` range bounds, and full-text search across reasons, entity references, actions, and modules, with populated actor details.
+  - Added debounced multi-field filter bar in the Admin Audit view.
+  - Implemented before/after JSON change diff modal for inspecting audit record mutations.
+  - Added direct client-side CSV export (`exportFilteredAuditToCsv`) to download filtered audit logs instantly.
+- In-App & PWA Notification Architecture (`client/src/components/layout/AppShell.tsx`, `client/public/manifest.json`, `client/public/sw.js`, `BL-052`):
+  - Bell header interaction now supports dual behavior: quick-glance dropdown preview on mouse hover, and click-to-pin open (with pinned indicator, outside-click dismissal, close button, and Escape key dismissal).
+  - Configured PWA Service Worker with Push Notification listener and window focus/open click handler.
+  - Added Web App Manifest with standalone display, dark/amber theme colors, and mobile icons.
+- Validation passed: `tsc --noEmit` on client and server passed (0 errors); client Vite build passed; all 14 server Jest suites (52 tests, including `MongoMemoryReplSet` E2E workflows) passed.
+
 ## RULES  for  BURAMLOOP AI DEVELOPMENT
 
 1. Inspect existing code before proposing changes.

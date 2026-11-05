@@ -1,4 +1,4 @@
-// client/src/components/layout/AppShell.tsx
+﻿// client/src/components/layout/AppShell.tsx
 import React, { useEffect, useState } from 'react';
 import {
   Activity,
@@ -26,8 +26,10 @@ import {
   UserRound,
   Settings2,
   Camera,
+  Volume2,
 } from 'lucide-react';
-import { UserSession } from '../../types/erp';
+import { UserSession, NotificationItem } from '../../types/erp';
+import { playNotificationChime } from '../../lib/notificationSound';
 import { StatusBadge } from '../ui/IndustrialPrimitives';
 import { ProcessFlowBreadcrumb } from '../ui/FlowAndInfoPrimitives';
 import { ThemeToggle } from '../ui/ThemeToggle';
@@ -52,7 +54,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'SOURCING', label: 'Gated Sourcing Pipeline', shortCode: 'SRC-5C', stepStatus: 'LIVE', icon: GitBranch },
   { key: 'INCOMING_QA', label: 'Lot Intake & QA', shortCode: 'LOT-5D', stepStatus: 'LIVE', icon: PackageCheck },
   { key: 'WAREHOUSE_STOCK', label: 'Stock & Ledger', shortCode: 'STK-5D', stepStatus: 'LIVE', icon: Database },
-  { key: 'WARM_CABINETS', label: 'Warm Cabinets (2×17)', shortCode: 'CAB-5F', stepStatus: 'LIVE', icon: Flame },
+  { key: 'WARM_CABINETS', label: 'Warm Cabinets (2├ù17)', shortCode: 'CAB-5F', stepStatus: 'LIVE', icon: Flame },
   { key: 'BATCH_PLANNING', label: 'Batch Feasibility & Lock', shortCode: 'BAT-5F', stepStatus: 'LIVE', icon: Layers },
   { key: 'PROCESSING', label: 'Processing & Filling (7-Stage)', shortCode: 'PRC-5G', stepStatus: '5G', icon: Cpu },
   { key: 'SHIPMENTS', label: 'Customer & Shipment LOTs', shortCode: 'SHP-5H', stepStatus: '5H', icon: Truck },
@@ -71,6 +73,8 @@ export const AppShell: React.FC<{
   nextcloudOnline: boolean;
   lastSyncIso: string | null;
   unreadNotificationsCount: number;
+  notifications?: NotificationItem[];
+  onAcknowledgeNotification?: (id: string) => void;
   onLogout: () => void;
   onOpenMobileScanner: () => void;
   children: React.ReactNode;
@@ -82,12 +86,40 @@ export const AppShell: React.FC<{
   nextcloudOnline,
   lastSyncIso,
   unreadNotificationsCount,
+  notifications = [],
+  onAcknowledgeNotification,
   onLogout,
   onOpenMobileScanner,
   children,
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isNotifHovered, setIsNotifHovered] = useState(false);
+  const notifContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const hoverTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Close dropdown on click outside or Escape
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifContainerRef.current && !notifContainerRef.current.contains(e.target as Node)) {
+        setIsNotifOpen(false);
+        setIsNotifHovered(false);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsNotifOpen(false);
+        setIsNotifHovered(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [warehouseExpanded, setWarehouseExpanded] = useState(
     activeModule === 'INCOMING_QA' || activeModule === 'WAREHOUSE_STOCK'
@@ -196,7 +228,7 @@ export const AppShell: React.FC<{
                     </span>
                   </div>
                   <span className="text-[11px] font-mono text-buram-muted block truncate">
-                    HENNIGSDORF • ERP-OPS
+                    HENNIGSDORF ÔÇó ERP-OPS
                   </span>
                 </div>
               )}
@@ -312,7 +344,7 @@ export const AppShell: React.FC<{
                   className="w-full bg-buram-bg border border-buram-border rounded pl-9 pr-2 sm:pr-16 py-2 sm:py-1.5 text-xs text-buram-text placeholder-buram-muted/60 focus:border-buram-amber font-mono"
                 />
                 <kbd className="hidden sm:block absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono px-1.5 py-0.5 bg-buram-elevated text-buram-muted rounded border border-buram-border">
-                  ⌘K
+                  ÔîÿK
                 </kbd>
               </div>
               {canReceiveIncomingLots(user) && (
@@ -355,20 +387,158 @@ export const AppShell: React.FC<{
               </div>
             )}
 
-            {/* Notification Bell */}
-            <button
-              type="button"
-              onClick={() => selectModule('AUDIT_DOCS')}
-              className="relative p-2 rounded bg-buram-elevated border border-buram-border text-buram-text hover:border-buram-amber"
-              aria-label={`Notifications (${unreadNotificationsCount} unread)`}
+            {/* Notification Bell: Hover preview + Click to open & pin */}
+            <div
+              ref={notifContainerRef}
+              className="relative"
+              onMouseEnter={() => {
+                if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+                setIsNotifHovered(true);
+              }}
+              onMouseLeave={() => {
+                if (!isNotifOpen) {
+                  hoverTimeoutRef.current = setTimeout(() => {
+                    setIsNotifHovered(false);
+                  }, 250);
+                }
+              }}
             >
-              <Bell className="w-4 h-4 text-buram-gold" />
-              {unreadNotificationsCount > 0 && (
-                <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-buram-critical text-white tabular-nums">
-                  {unreadNotificationsCount}
-                </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNotifOpen((prev) => !prev);
+                  setIsNotifHovered(true);
+                }}
+                className={`relative p-2 rounded border text-buram-text transition-colors ${
+                  isNotifOpen || isNotifHovered
+                    ? 'bg-buram-elevated border-buram-amber text-buram-gold ring-1 ring-buram-amber/50'
+                    : 'bg-buram-elevated border-buram-border hover:border-buram-amber'
+                }`}
+                aria-label={`Notifications (${unreadNotificationsCount} unread)`}
+                aria-expanded={isNotifOpen || isNotifHovered}
+                title="Notifications: Hover for quick glance, Click to keep open"
+              >
+                <Bell className="w-4 h-4 text-buram-gold" />
+                {unreadNotificationsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-buram-critical text-white tabular-nums animate-pulse">
+                    {unreadNotificationsCount}
+                  </span>
+                )}
+              </button>
+
+              {/* Dropdown Panel: Visible on Hover OR Pinned on Click */}
+              {(isNotifOpen || isNotifHovered) && (
+                <div
+                  className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-xl border border-buram-border bg-buram-surface border-buram-amber/40 p-3.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 text-left"
+                  role="region"
+                  aria-label="Notification dropdown"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between border-b border-buram-border pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-buram-amber" />
+                      <span className="font-mono text-xs font-bold uppercase tracking-wider text-buram-text">
+                        Notifications ({user.role})
+                      </span>
+                      {isNotifOpen && (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-buram-amber/20 text-buram-gold border border-buram-amber/40">
+                          PINNED
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => playNotificationChime('info')}
+                        className="p-1 rounded text-buram-muted hover:text-buram-gold hover:bg-buram-elevated transition-colors"
+                        title="Test alert chime sound"
+                        aria-label="Test chime sound"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsNotifOpen(false);
+                          setIsNotifHovered(false);
+                        }}
+                        className="p-1 rounded text-buram-muted hover:text-buram-text hover:bg-buram-elevated transition-colors"
+                        title="Close dropdown"
+                        aria-label="Close dropdown"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5 max-h-72 overflow-y-auto space-y-2 divide-y divide-buram-border/40">
+                    {notifications.length === 0 ? (
+                      <p className="py-5 text-center text-xs text-buram-muted font-mono">
+                        No active notifications for your role.
+                      </p>
+                    ) : (
+                      notifications.slice(0, 10).map((n) => (
+                        <div key={n.id} className="pt-2 first:pt-0 text-left">
+                          <div className="flex items-start justify-between gap-2">
+                            <span
+                              className={`text-xs font-semibold ${
+                                n.severity === 'CRITICAL'
+                                  ? 'text-buram-critical'
+                                  : n.severity === 'WARNING'
+                                  ? 'text-buram-amber'
+                                  : 'text-buram-text'
+                              }`}
+                            >
+                              {n.title}
+                            </span>
+                            <span className="text-[10px] font-mono text-buram-muted shrink-0 tabular-nums">
+                              {new Date(n.createdAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-buram-muted line-clamp-2 leading-snug">
+                            {n.message}
+                          </p>
+                          <div className="mt-1.5 flex items-center justify-between text-[10px] font-mono">
+                            <span className="text-buram-tech">{n.category}</span>
+                            {!n.acknowledged && onAcknowledgeNotification ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onAcknowledgeNotification(n.id);
+                                }}
+                                className="px-2 py-0.5 rounded bg-buram-elevated border border-buram-border text-buram-pale hover:border-buram-amber hover:text-buram-gold transition-colors"
+                              >
+                                Mark read
+                              </button>
+                            ) : (
+                              <span className="text-buram-muted text-[10px]">Read</span>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="mt-2.5 pt-2 border-t border-buram-border flex items-center justify-between text-xs font-mono">
+                    <span className="text-[10px] text-buram-muted">
+                      {unreadNotificationsCount} unread
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsNotifOpen(false);
+                        setIsNotifHovered(false);
+                        selectModule('AUDIT_DOCS');
+                      }}
+                      className="text-buram-amber hover:text-buram-gold font-semibold"
+                    >
+                      View all in Audit →
+                    </button>
+                  </div>
+                </div>
               )}
-            </button>
+            </div>
 
             {/* Authenticated user actions */}
             <div className="flex items-center gap-2 pl-2 border-l border-buram-border">

@@ -171,7 +171,8 @@ export type ProcessStageName =
 export interface StockMovementEntry {
   id: string;
   timestamp: string;
-  movementType: 'RECEIPT' | 'RESERVE' | 'RELEASE' | 'CABINET_IN' | 'CABINET_OUT' | 'CONSUME' | 'REWORK_GEN' | 'RETURN_SUPPLIER';
+  // Server STOCK_MOVEMENT_TYPES value (e.g. RECEIPT, RESERVE_BATCH, WARM_IN, CONSUME_BATCH).
+  movementType: string;
   drumCode: string;
   lotNumber: string;
   deltaKg: number;

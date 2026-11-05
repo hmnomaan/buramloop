@@ -1,4 +1,4 @@
-import React, { FormEvent, useCallback, useEffect, useState } from 'react';
+﻿import React, { FormEvent, useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle,
   Database,
@@ -145,12 +145,15 @@ interface TraceResponse {
 interface AuditRecord {
   _id: string;
   createdAt: string;
+  actorId?: { _id?: string; fullName?: string; email?: string } | string;
   actorRole: string;
   module: string;
   action: string;
   entityType: string;
   entityRef?: string | null;
   reason?: string | null;
+  before?: unknown;
+  after?: unknown;
 }
 
 interface ExportLogRecord {
@@ -167,7 +170,18 @@ type ExportDataset = 'INCOMING_LOTS' | 'DRUM_STOCK' | 'BATCHES_PROCESS' | 'SHIPM
 type ExportFormat = 'CSV' | 'XLSX' | 'PDF' | 'DOCX' | 'PRINT_JSON';
 
 export const TraceabilityAuditWorkspace: React.FC<{ user: UserSession }> = ({ user }) => {
+  const [activeTab, setActiveTab] = useState<'GOVT_TRACE' | 'ADMIN_AUDIT'>(
+    user.role === 'INSPECTOR' ? 'GOVT_TRACE' : 'ADMIN_AUDIT'
+  );
   const [queryCode, setQueryCode] = useState('');
+  // Advanced Admin Audit Filters
+  const [filterModule, setFilterModule] = useState('ALL');
+  const [filterAction, setFilterAction] = useState('ALL');
+  const [filterRole, setFilterRole] = useState('ALL');
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [auditSearchQuery, setAuditSearchQuery] = useState('');
+  const [selectedAuditLog, setSelectedAuditLog] = useState<AuditRecord | null>(null);
   const [traceData, setTraceData] = useState<TraceResponse | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditRecord[]>([]);
   const [exportLogs, setExportLogs] = useState<ExportLogRecord[]>([]);
@@ -245,6 +259,31 @@ export const TraceabilityAuditWorkspace: React.FC<{ user: UserSession }> = ({ us
     }
   };
 
+  const exportFilteredAuditToCsv = () => {
+    if (auditLogs.length === 0) return;
+    const headers = ['Timestamp (CET)', 'Role', 'Actor', 'Module', 'Action', 'Entity Type', 'Reference', 'Reason'];
+    const rows = auditLogs.map((log) => [
+      `"${new Date(log.createdAt).toLocaleString('de-DE')}"`,
+      `"${log.actorRole}"`,
+      `"${typeof log.actorId === 'object' ? log.actorId?.fullName || log.actorId?.email || 'System' : 'System'}"`,
+      `"${log.module}"`,
+      `"${log.action}"`,
+      `"${log.entityType}"`,
+      `"${log.entityRef ?? ''}"`,
+      `"${(log.reason ?? '').replace(/"/g, '""')}"`,
+    ]);
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `buramloop_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleRunExport = async () => {
     setIsExporting(true);
     setTraceError(null);
@@ -301,7 +340,7 @@ export const TraceabilityAuditWorkspace: React.FC<{ user: UserSession }> = ({ us
         <CountryOriginBadge countryIso={slice.country} />
         <span>{slice.pct.toFixed(1)}% ({slice.kg.toFixed(3)} kg)</span>
         {slice.costSharePct !== undefined && (
-          <span>• {slice.costSharePct.toFixed(1)}% cost</span>
+          <span>â€¢ {slice.costSharePct.toFixed(1)}% cost</span>
         )}
       </span>
     ));
@@ -372,14 +411,14 @@ export const TraceabilityAuditWorkspace: React.FC<{ user: UserSession }> = ({ us
             </div>
             <span className="text-buram-muted">
               {traceData.inspectorMode ? 'INSPECTOR REDACTION' : traceData.pricesVisible ? 'ADMIN PRICE VIEW' : 'PRICE FIELDS MASKED'}
-              {' • '}{formatDate(traceData.snapshotAt)}
+              {' â€¢ '}{formatDate(traceData.snapshotAt)}
             </span>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="p-3 rounded bg-buram-bg/80 border border-buram-border space-y-2">
               <h2 className="text-buram-amber uppercase font-bold">
-                Incoming lots ({traceData.upstream.incomingLots.length}) • Packages ({traceData.upstream.drumsCount + traceData.upstream.packages.length})
+                Incoming lots ({traceData.upstream.incomingLots.length}) â€¢ Packages ({traceData.upstream.drumsCount + traceData.upstream.packages.length})
               </h2>
               {traceData.upstream.incomingLots.map((lot) => (
                 <article key={lot._id} className="p-2 rounded bg-buram-surface border border-buram-border">
@@ -387,11 +426,11 @@ export const TraceabilityAuditWorkspace: React.FC<{ user: UserSession }> = ({ us
                     <strong className="text-buram-gold">{lot.lotNo}</strong>
                     <CountryOriginBadge countryIso={lot.country} />
                   </div>
-                  <p>{lot.sourceNameSnapshot ?? 'Supplier not recorded'} • {lot.status}</p>
+                  <p>{lot.sourceNameSnapshot ?? 'Supplier not recorded'} â€¢ {lot.status}</p>
                   <p>
-                    {lot.packageCount ?? lot.drumsCount ?? 0} × {lot.packageType ?? 'package'} • {lot.totalNetKg} kg
+                    {lot.packageCount ?? lot.drumsCount ?? 0} Ã— {lot.packageType ?? 'package'} â€¢ {lot.totalNetKg} kg
                     {lot.unitWeightKg ? ` (${lot.unitWeightKg} kg/package)` : ''}
-                    {lot.unitPriceEurPerKg !== undefined && ` • €${lot.unitPriceEurPerKg.toFixed(2)}/kg`}
+                    {lot.unitPriceEurPerKg !== undefined && ` â€¢ â‚¬${lot.unitPriceEurPerKg.toFixed(2)}/kg`}
                   </p>
                 </article>
               ))}
@@ -400,7 +439,7 @@ export const TraceabilityAuditWorkspace: React.FC<{ user: UserSession }> = ({ us
                   <div className="flex justify-between gap-2">
                     <strong>{drum.drumCode}</strong><StatusBadge label={drum.status} variant="TECHNICAL" />
                   </div>
-                  <p>{drum.country} • {drum.netKg} kg • {drum.location}</p>
+                  <p>{drum.country} â€¢ {drum.netKg} kg â€¢ {drum.location}</p>
                   {drum.originComposition?.length ? <div className="flex flex-wrap gap-1 mt-1">{renderOrigin(drum.originComposition)}</div> : null}
                 </article>
               ))}
@@ -409,7 +448,7 @@ export const TraceabilityAuditWorkspace: React.FC<{ user: UserSession }> = ({ us
                   <div className="flex justify-between gap-2">
                     <strong>{stockPackage.packageCode}</strong><StatusBadge label={stockPackage.status} variant="TECHNICAL" />
                   </div>
-                  <p>{stockPackage.country} • {stockPackage.netKg} kg • {stockPackage.location}</p>
+                  <p>{stockPackage.country} â€¢ {stockPackage.netKg} kg â€¢ {stockPackage.location}</p>
                   {stockPackage.originComposition?.length ? <div className="flex flex-wrap gap-1 mt-1">{renderOrigin(stockPackage.originComposition)}</div> : null}
                 </article>
               ))}
@@ -417,27 +456,27 @@ export const TraceabilityAuditWorkspace: React.FC<{ user: UserSession }> = ({ us
 
             <div className="p-3 rounded bg-buram-bg/80 border border-buram-border space-y-2">
               <h2 className="text-buram-tech uppercase font-bold">
-                Production ({traceData.production.batches.length}) • Rework ({traceData.production.reworkStocks.length})
+                Production ({traceData.production.batches.length}) â€¢ Rework ({traceData.production.reworkStocks.length})
               </h2>
               {traceData.production.batches.map((batch) => (
                 <article key={batch._id} className="p-2 rounded bg-buram-surface border border-buram-border space-y-1">
                   <div className="flex justify-between gap-2">
                     <strong className="text-buram-gold">{batch.processNo}</strong><StatusBadge label={batch.status} variant="TECHNICAL" />
                   </div>
-                  <p>Input {batch.approvedKg} kg • Output {batch.actualOutKg ?? 0} kg</p>
+                  <p>Input {batch.approvedKg} kg â€¢ Output {batch.actualOutKg ?? 0} kg</p>
                   <div className="flex flex-wrap gap-1">{renderOrigin(batch.originComposition)}</div>
                 </article>
               ))}
               {traceData.production.processSteps.map((step) => (
                 <article key={step._id} className="p-2 rounded bg-buram-surface border border-buram-border">
-                  <strong>{step.processNo} • {step.stepSequence}. {step.stepType}</strong>
-                  <p>{step.inKg} in → {step.outKg} out • {step.lossKg} loss • {step.reworkOutKg} rework • {step.tempC}°C</p>
+                  <strong>{step.processNo} â€¢ {step.stepSequence}. {step.stepType}</strong>
+                  <p>{step.inKg} in â†’ {step.outKg} out â€¢ {step.lossKg} loss â€¢ {step.reworkOutKg} rework â€¢ {step.tempC}Â°C</p>
                   {step.completedAt && <p className="text-buram-muted">{formatDate(step.completedAt)}</p>}
                 </article>
               ))}
               {traceData.production.batchInputs.map((input) => (
                 <article key={input._id} className="p-2 rounded bg-buram-surface border border-buram-border">
-                  <strong>{input.processNo} • {input.inputKind}</strong><p>{input.qtyKg} kg</p>
+                  <strong>{input.processNo} â€¢ {input.inputKind}</strong><p>{input.qtyKg} kg</p>
                   <div className="flex flex-wrap gap-1">{renderOrigin(input.originSnapshot)}</div>
                 </article>
               ))}
@@ -446,7 +485,7 @@ export const TraceabilityAuditWorkspace: React.FC<{ user: UserSession }> = ({ us
                   <div className="flex justify-between gap-2">
                     <strong className="text-buram-gold">{rework.reworkNo}</strong><KgDisplay kg={rework.remainingKg} size="sm" />
                   </div>
-                  <p>{rework.sourceProcessNo} • {rework.sourceStage ?? 'stage unknown'} • {rework.status}</p>
+                  <p>{rework.sourceProcessNo} â€¢ {rework.sourceStage ?? 'stage unknown'} â€¢ {rework.status}</p>
                   <div className="flex flex-wrap gap-1">{renderOrigin(rework.origin)}</div>
                 </article>
               ))}
@@ -454,7 +493,7 @@ export const TraceabilityAuditWorkspace: React.FC<{ user: UserSession }> = ({ us
 
             <div className="p-3 rounded bg-buram-bg/80 border border-buram-border space-y-2">
               <h2 className="text-buram-success uppercase font-bold">
-                Shipments ({traceData.downstream.shipmentLots.length}) • Customers ({traceData.downstream.customers.length})
+                Shipments ({traceData.downstream.shipmentLots.length}) â€¢ Customers ({traceData.downstream.customers.length})
               </h2>
               {traceData.downstream.shipmentLots.map((shipment) => {
                 const customer = traceData.downstream.customers.find(
@@ -465,8 +504,8 @@ export const TraceabilityAuditWorkspace: React.FC<{ user: UserSession }> = ({ us
                     <div className="flex justify-between gap-2">
                       <strong className="text-buram-gold">{shipment.shipmentLotNo}</strong><StatusBadge label={shipment.status} variant="NOMINAL" />
                     </div>
-                    <p>{shipment.processNo} • {customer?.name ?? 'Customer'} • {shipment.destinationCountry}</p>
-                    <p>Ordered {shipment.orderedKg} kg • Shipped {shipment.shippedKg} kg</p>
+                    <p>{shipment.processNo} â€¢ {customer?.name ?? 'Customer'} â€¢ {shipment.destinationCountry}</p>
+                    <p>Ordered {shipment.orderedKg} kg â€¢ Shipped {shipment.shippedKg} kg</p>
                     <p>Allowed origins: {shipment.allowedCountriesSnapshot.join(', ')}</p>
                     <div className="flex flex-wrap gap-1 mt-1">{renderOrigin(shipment.originComposition)}</div>
                   </article>
@@ -485,7 +524,7 @@ export const TraceabilityAuditWorkspace: React.FC<{ user: UserSession }> = ({ us
                     <td className="p-2">{formatDate(movement.createdAt)}</td>
                     <td className="p-2">{movement.movementType}</td>
                     <td className="p-2">{movement.signedKg} kg{movement.signedQty !== undefined ? ` / ${movement.signedQty} ${movement.quantityUnit ?? ''}` : ''}</td>
-                    <td className="p-2">{movement.reason ?? '—'}</td>
+                    <td className="p-2">{movement.reason ?? 'â€”'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -537,7 +576,7 @@ export const TraceabilityAuditWorkspace: React.FC<{ user: UserSession }> = ({ us
         {auditLogs.length > 0 && (
           <table className="w-full mt-3 text-left font-mono text-xs">
             <thead><tr className="border-b border-buram-border text-buram-muted"><th className="p-2">Timestamp</th><th className="p-2">Role</th><th className="p-2">Action</th><th className="p-2">Entity</th><th className="p-2">Reason</th></tr></thead>
-            <tbody>{auditLogs.slice(0, 50).map((log) => <tr key={log._id} className="border-b border-buram-border/40"><td className="p-2">{formatDate(log.createdAt)}</td><td className="p-2">{log.actorRole}</td><td className="p-2">{log.module}:{log.action}</td><td className="p-2">{log.entityRef ?? log.entityType}</td><td className="p-2">{log.reason ?? '—'}</td></tr>)}</tbody>
+            <tbody>{auditLogs.slice(0, 50).map((log) => <tr key={log._id} className="border-b border-buram-border/40"><td className="p-2">{formatDate(log.createdAt)}</td><td className="p-2">{log.actorRole}</td><td className="p-2">{log.module}:{log.action}</td><td className="p-2">{log.entityRef ?? log.entityType}</td><td className="p-2">{log.reason ?? 'â€”'}</td></tr>)}</tbody>
           </table>
         )}
       </section>
@@ -549,7 +588,7 @@ export const TraceabilityAuditWorkspace: React.FC<{ user: UserSession }> = ({ us
         {exportLogs.length > 0 && (
           <table className="w-full mt-3 text-left font-mono text-xs">
             <thead><tr className="border-b border-buram-border text-buram-muted"><th className="p-2">Timestamp</th><th className="p-2">Dataset</th><th className="p-2">Format</th><th className="p-2">File</th><th className="p-2">Entities</th></tr></thead>
-            <tbody>{exportLogs.map((log) => <tr key={log._id} className="border-b border-buram-border/40"><td className="p-2">{formatDate(log.createdAt)}</td><td className="p-2">{log.module}</td><td className="p-2">{log.format}</td><td className="p-2">{log.fileName ?? '—'}</td><td className="p-2">{log.entityIds?.length ?? 0}</td></tr>)}</tbody>
+            <tbody>{exportLogs.map((log) => <tr key={log._id} className="border-b border-buram-border/40"><td className="p-2">{formatDate(log.createdAt)}</td><td className="p-2">{log.module}</td><td className="p-2">{log.format}</td><td className="p-2">{log.fileName ?? 'â€”'}</td><td className="p-2">{log.entityIds?.length ?? 0}</td></tr>)}</tbody>
           </table>
         )}
       </section>
