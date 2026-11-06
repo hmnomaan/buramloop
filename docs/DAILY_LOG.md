@@ -572,6 +572,18 @@ check.
 - **Validation:** `tsc -b && vite build` passed in 9.10s (0 errors); visual truncation and clipping eliminated.
 - **Open/blockers:** Live container deployment and browser acceptance testing remain open.
 
+- **Completed:** Implemented Dual Traceability Route Model & Station-by-Station Operational Deep Inspection (`ctx-v73`, `BL-057`):
+  - Enforced strict domain boundary: decoupled financial KPI bars (costs, margins, valuation) from product traceability and documented their assignment to the upcoming dedicated "Costs, Margins & Reports" (`ADMIN_COSTS`) workspace.
+  - Integrated a 5-step process sequence stepper directly above trace results: Step 1: Eingangschargen (Source Lots), Step 2: Gebinde / Fässer (Drums & Containers), Step 3: Produktionscharge (Blending Batch), Step 4: Prozesskette & Stationen (Route & Processing), Step 5: Vorschau & Zertifikat (Certificate & Shipment Preview) + All Steps (6-Column Explorer) panorama view.
+  - Surfaced real physical facility route across 6 stations for Staff/Admin: Dock WE -> Warm Cabinets CAB-01/02 -> Filter Press FLT-01 -> Mixing Tank MIX-01 & Resting Tank TANK-01 -> Packaging Line QUIEL_PET/CARLO_JAR -> Outbound Shipping Dock.
+  - Built interactive `OperationalRouteStepInspectorModal` providing Staff/Admin deep dive into machine telemetry, operator name, duration/dwell time, DIN 1333 mass balance (In, Out, Loss, Rework kg), and legal counterparties.
+  - Preserved approved masked regulatory route for Government Inspectors (`SUPPLIER-PL`, `BUYER-DE`, QSI lab badges, zero internal machine codes, zero pricing, and GoBD stock movement ledger filtering).
+  - Expanded `shared/src/schemas/formatters-de.ts` with 22 new bilingual keys across German (DE), English (EN), Turkish (TR), and Bengali (BN).
+  - Conducted full responsive UI audit and hardened layout across mobile, tablet, laptop, and ultra-wide displays: added horizontal `overflow-x-auto` wrappers on Origin Certificate tables preventing mobile page blowout, enabled 6-column panoramic layout at `xl` breakpoint (`xl:grid-cols-6`), added active stage focus banner, and hardened buttons and chips with `min-w-0` and truncation.
+- **Issues/fixes:** [BL-057](./ISSUES_AND_FIXES.md#resolved).
+- **Validation:** Client production build passed: `tsc -b && vite build` (0 errors, 7.38s); server build passed: `tsc` (0 errors); all 15 server Jest test suites (57 tests) passed in 17.48s.
+- **Open/blockers:** Live container deployment and browser acceptance testing remain open.
+
 ## Daily entry template
 
 ## YYYY-MM-DD

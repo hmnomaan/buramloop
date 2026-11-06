@@ -31,7 +31,7 @@ symptom, root cause, change, and verification result.
 - `pnpm -r build` and `pnpm --filter @buramloop/server build` pass after
   resolving the batch/process/shipment compiler failures ([BL-014](./ISSUES_AND_FIXES.md#resolved)).
 - The ctx-v57 `pnpm typecheck`, `pnpm build`, and `pnpm test` passed;
-- The ctx-v70/ctx-v71 pnpm typecheck, pnpm build, and all 15 server Jest suites (57 tests) pass, including the complete sourcing-to-receipt and receipt-to-trace/export MongoMemoryReplSet workflows.
+- The ctx-v70/ctx-v71/ctx-v73 pnpm typecheck, pnpm build, and all 15 server Jest suites (57 tests) pass, including the complete sourcing-to-receipt and receipt-to-trace/export MongoMemoryReplSet workflows. Dual Traceability Route Model (BL-057) decouples financial KPI bars to the future "Costs, Margins & Reports" module and provides 5-step sequence stepper, station telemetry strip, and deep operational step inspector for Admin while preserving masked regulatory route for Inspectors.
   sourcing-to-receipt MongoMemoryReplSet workflow, offer normalization,
   contract-price inheritance, receipt-to-shipment/cost/trace coverage, and
   persisted QA release to Warehouse followed by batch feasibility

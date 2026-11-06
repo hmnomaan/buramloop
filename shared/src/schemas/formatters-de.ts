@@ -127,6 +127,27 @@ export interface TraceDictionary {
   reworkFromOrigin: string;
   sourceCountryCount: string;
   sourceCompanyHidden: string;
+  step1Lot: string;
+  step2Drums: string;
+  step3Batch: string;
+  step4Process: string;
+  step5Preview: string;
+  allStepsView: string;
+  routeStepperTitle: string;
+  adminStationRouteTitle: string;
+  adminStationRouteSub: string;
+  modalStationTitle: string;
+  modalCloseBtn: string;
+  operatorLabel: string;
+  machineIdLabel: string;
+  equipmentStationLabel: string;
+  durationLabel: string;
+  lossMetricLabel: string;
+  reworkMetricLabel: string;
+  counterpartyLabel: string;
+  auditAnchorLabel: string;
+  viewDetailsBtn: string;
+  massBalanceTitle: string;
 }
 
 export const TRACE_MULTILANG_I18N: Record<InspectionLanguage, TraceDictionary> = {
@@ -146,7 +167,7 @@ export const TRACE_MULTILANG_I18N: Record<InspectionLanguage, TraceDictionary> =
     viewChainBtn: '⛓️ 6-Stufen Chargenkette (Detail)',
     viewCertBtn: '📄 Ursprungszertifikat & Übersicht',
     holdActionBtn: '🚨 Charge sofort sperren (IFS Hold)',
-    staffViewBtn: 'Interne Ansicht',
+    staffViewBtn: 'Interne Ansicht (Admin Route)',
     inspectorViewBtn: 'Behördenansicht (Maskiert)',
     whereItCameFromTitle: 'HERKUNFT & VERBLEIB (EIN SCHRITT VOR, EIN SCHRITT ZURÜCK)',
     whereItCameFromSub:
@@ -176,6 +197,28 @@ export const TRACE_MULTILANG_I18N: Record<InspectionLanguage, TraceDictionary> =
     reworkFromOrigin: 'Rework aus dieser Herkunft',
     sourceCountryCount: 'Ursprungsländer',
     sourceCompanyHidden: 'Lieferantenfirmenname in dieser Behördenansicht maskiert.',
+    step1Lot: '1 · Eingangschargen',
+    step2Drums: '2 · Gebinde / Fässer',
+    step3Batch: '3 · Produktionscharge',
+    step4Process: '4 · Prozesskette & Stationen',
+    step5Preview: '5 · Vorschau & Zertifikat',
+    allStepsView: 'Alle Stufen (6-Spalten)',
+    routeStepperTitle: 'STUFENWEISE PROZESS- UND ROUTENSEQUENZ',
+    adminStationRouteTitle: 'STATIONENROUTE & BETRIEBSTELEMETRIE (ADMIN-DETAIL)',
+    adminStationRouteSub:
+      'Lückenlose Stationsabfolge von Dock WE über Wärmekammern, Filtration und Mischtanks bis zur Abfüllung',
+    modalStationTitle: 'Betriebsstation & Prozessinspektor',
+    modalCloseBtn: 'Schließen',
+    operatorLabel: 'Verantwortlicher Bediener',
+    machineIdLabel: 'Maschinen- / Anlagen-Code',
+    equipmentStationLabel: 'Station / Ausrüstung',
+    durationLabel: 'Dauer / Verweilzeit',
+    lossMetricLabel: 'Prozessverlust (kg)',
+    reworkMetricLabel: 'Rework-Ausschleusung (kg)',
+    counterpartyLabel: 'Rechtlicher Vertragspartner',
+    auditAnchorLabel: 'GoBD-Snapshot & Ledger-Anker',
+    viewDetailsBtn: 'Detailinspektion öffnen',
+    massBalanceTitle: 'Massenbilanz & Chargenprüfung (DIN 1333)',
   },
   EN: {
     assuranceTag: 'ASSURANCE · IFS FOOD V8 & HONIGV STANDARD',
@@ -193,7 +236,7 @@ export const TRACE_MULTILANG_I18N: Record<InspectionLanguage, TraceDictionary> =
     viewChainBtn: '⛓️ 6-Column Chain Explorer',
     viewCertBtn: '📄 Origin Certificate Preview',
     holdActionBtn: '🚨 Place Regulatory Hold (IFS)',
-    staffViewBtn: 'Staff view',
+    staffViewBtn: 'Staff view (Admin Route)',
     inspectorViewBtn: 'Inspector view (Masked)',
     whereItCameFromTitle: 'WHERE IT CAME FROM, WHERE IT WENT',
     whereItCameFromSub: 'Every card is a stored record — click it to open its movements',
@@ -222,6 +265,28 @@ export const TRACE_MULTILANG_I18N: Record<InspectionLanguage, TraceDictionary> =
     reworkFromOrigin: 'Rework from this source',
     sourceCountryCount: 'source country(ies)',
     sourceCompanyHidden: 'Source company information is not displayed in this regulatory view.',
+    step1Lot: '1 · Source Lots',
+    step2Drums: '2 · Drums & Containers',
+    step3Batch: '3 · Production Batch',
+    step4Process: '4 · Route & Stations',
+    step5Preview: '5 · Certificate Preview',
+    allStepsView: 'All Steps (6-Column)',
+    routeStepperTitle: 'STEP-BY-STEP PROCESS & ROUTE SEQUENCE',
+    adminStationRouteTitle: 'STATION ROUTE & OPERATIONAL TELEMETRY (ADMIN DETAIL)',
+    adminStationRouteSub:
+      'Complete station path from receiving dock through warm cabinets, filtration, mixing tanks to filling lines',
+    modalStationTitle: 'Operational Station & Route Inspector',
+    modalCloseBtn: 'Close',
+    operatorLabel: 'Operator in charge',
+    machineIdLabel: 'Machine / Station Code',
+    equipmentStationLabel: 'Station / Equipment',
+    durationLabel: 'Duration / Dwell Time',
+    lossMetricLabel: 'Process loss (kg)',
+    reworkMetricLabel: 'Rework generated (kg)',
+    counterpartyLabel: 'Legal Counterparty',
+    auditAnchorLabel: 'GoBD Snapshot & Ledger Anchor',
+    viewDetailsBtn: 'Open deep inspection',
+    massBalanceTitle: 'Mass Balance & Batch Verification (DIN 1333)',
   },
   TR: {
     assuranceTag: 'KALİTE GÜVENCESİ · IFS FOOD V8 VE HONIGV STANDARDI',
@@ -239,7 +304,7 @@ export const TRACE_MULTILANG_I18N: Record<InspectionLanguage, TraceDictionary> =
     viewChainBtn: '⛓️ 6 Sütunlu Zincir Gezgini',
     viewCertBtn: '📄 Menşe Sertifikası Önizleme',
     holdActionBtn: '🚨 Partiyi Hemen Askıya Al (IFS)',
-    staffViewBtn: 'Personel Görünümü',
+    staffViewBtn: 'Personel Görünümü (Admin Rotası)',
     inspectorViewBtn: 'Denetçi Görünümü (Maskeli)',
     whereItCameFromTitle: 'NEREDEN GELDİ, NEREYE GİTTİ (BİR ADIM İLERİ, BİR ADIM GERİ)',
     whereItCameFromSub: 'Her kart kalıcı bir kayıttır — hareketleri filtrelemek için karta tıklayın',
@@ -268,6 +333,28 @@ export const TRACE_MULTILANG_I18N: Record<InspectionLanguage, TraceDictionary> =
     reworkFromOrigin: 'Bu menşeden rework',
     sourceCountryCount: 'menşe ülke',
     sourceCompanyHidden: 'Tedarikçi şirket bilgisi bu denetim görünümünde gizlenmiştir.',
+    step1Lot: '1 · Kaynak Lotlar',
+    step2Drums: '2 · Variller ve Kaplar',
+    step3Batch: '3 · Üretim Partisi',
+    step4Process: '4 · Rota ve İstasyonlar',
+    step5Preview: '5 · Sertifika Önizleme',
+    allStepsView: 'Tüm Aşamalar (6 Sütun)',
+    routeStepperTitle: 'ADIM ADIM PROSES VE ROTA SIRASI',
+    adminStationRouteTitle: 'İSTASYON ROTASI VE İŞLETME TELEMETRİSİ (ADMİN DETAYI)',
+    adminStationRouteSub:
+      'Mal kabul rampasından ısıtma kabinlerine, filtrasyon ve mikser tanklarından dolum hatlarına tam rota',
+    modalStationTitle: 'İşletme İstasyonu ve Rota Denetçisi',
+    modalCloseBtn: 'Kapat',
+    operatorLabel: 'Sorumlu Operatör',
+    machineIdLabel: 'Makine / İstasyon Kodu',
+    equipmentStationLabel: 'İstasyon / Ekipman',
+    durationLabel: 'Süre / Bekleme Zamanı',
+    lossMetricLabel: 'Proses Kaybı (kg)',
+    reworkMetricLabel: 'Oluşan Rework (kg)',
+    counterpartyLabel: 'Yasal Muhatap Firma',
+    auditAnchorLabel: 'GoBD Anlık Görüntü ve Defter Çapası',
+    viewDetailsBtn: 'Detaylı İncelemeyi Aç',
+    massBalanceTitle: 'Kütle Dengesi ve Parti Doğrulaması (DIN 1333)',
   },
   BN: {
     assuranceTag: 'গুণমান নিশ্চিতকরণ · IFS ফুড v8 এবং হানি-ভি স্ট্যান্ডার্ড',
@@ -285,7 +372,7 @@ export const TRACE_MULTILANG_I18N: Record<InspectionLanguage, TraceDictionary> =
     viewChainBtn: '⛓️ ৬-ধাপ বিশিষ্ট চেইন এক্সপ্লোরার',
     viewCertBtn: '📄 অরিজিন সার্টিফিকেট প্রিভিউ',
     holdActionBtn: '🚨 তাৎক্ষণিক লট লক করুন (IFS)',
-    staffViewBtn: 'অভ্যন্তরীণ ভিউ',
+    staffViewBtn: 'অভ্যন্তরীণ ভিউ (অ্যাডমিন রুট)',
     inspectorViewBtn: 'পরিদর্শক ভিউ (মাস্কড)',
     whereItCameFromTitle: 'উৎস ও গন্তব্য (এক ধাপ এগিয়ে, এক ধাপ পেছনে)',
     whereItCameFromSub: 'প্রতিটি কার্ড একটি অপরিবর্তনশীল রেকর্ড — মুভমেন্ট ফিল্টার করতে ক্লিক করুন',
@@ -314,6 +401,28 @@ export const TRACE_MULTILANG_I18N: Record<InspectionLanguage, TraceDictionary> =
     reworkFromOrigin: 'এই উৎস থেকে রিওয়ার্ক',
     sourceCountryCount: 'উৎস দেশ',
     sourceCompanyHidden: 'পরিদর্শক ভিউতে সরবরাহকারীর নাম গোপন রাখা হয়েছে।',
+    step1Lot: '১ · ইনকামিং লট',
+    step2Drums: '২ · ড্রাম ও কন্টেইনার',
+    step3Batch: '৩ · উৎপাদন ব্যাচ',
+    step4Process: '৪ · রুট ও স্টেশনসমূহ',
+    step5Preview: '৫ · সার্টিফিকেট প্রিভিউ',
+    allStepsView: 'সব ধাপ (৬-কলাম)',
+    routeStepperTitle: 'ধাপে ধাপে প্রসেস ও রুট সিকোয়েন্স',
+    adminStationRouteTitle: 'স্টেশন রুট ও অপারেশনাল টেলিমেট্রি (অ্যাডমিন ডিটেইল)',
+    adminStationRouteSub:
+      'রিসিভিং ডক থেকে ওয়ার্ম ক্যাবিনেট, ফিল্ট্রেশন, মিক্সিং ট্যাংক হয়ে ফিলিং লাইন পর্যন্ত পূর্ণ রুট',
+    modalStationTitle: 'অপারেশনাল স্টেশন ও রুট পরিদর্শক',
+    modalCloseBtn: 'বন্ধ করুন',
+    operatorLabel: 'দায়িত্বপ্রাপ্ত অপারেটর',
+    machineIdLabel: 'মেশিন / স্টেশন কোড',
+    equipmentStationLabel: 'স্টেশন / যন্ত্রপাতি',
+    durationLabel: 'সময়কাল / স্থায়িত্ব',
+    lossMetricLabel: 'প্রসেস লস (কেজি)',
+    reworkMetricLabel: 'উৎপন্ন রিওয়ার্ক (কেজি)',
+    counterpartyLabel: 'আইনগত প্রতিপক্ষ প্রতিষ্ঠান',
+    auditAnchorLabel: 'GoBD স্ন্যাপশট ও লেজার নোঙ্গর',
+    viewDetailsBtn: 'বিস্তারিত পরিদর্শন খুলুন',
+    massBalanceTitle: 'ভর ভারসাম্য ও ব্যাচ যাচাইকরণ (DIN 1333)',
   },
 };
 

@@ -835,6 +835,40 @@ and [roadmap](./ROADMAP.md) for active status.*
     - **Active Trace Action Toolbar:** Created a dedicated contextual toolbar rendered directly above results when a trace record is active (`!isLoading && traceData`). Houses the active record identifier chip, the dual-view mode switcher (`6-Column Chain Explorer` vs. `Origin Certificate Preview`), and the IFS Food v8 instant regulatory hold button (`🚨 Charge sofort sperren (IFS Hold)`).
 - Validation passed: Client production build `tsc -b && vite build` passed (0 errors, 9.10s); visual overflow and clipping completely eliminated.
 
+## ctx-v73 — Dual Traceability Route Model & Station-by-Station Operational Deep Inspection (`BL-057`) (2026-11-06)
+
+- **Domain Scope Enforcement:** Enforced strict separation between the product traceability journey (physical honey movement, machinery, chemical analysis, custody transfer) and commercial/financial KPI metrics. Financial KPI bars (blend costs, margin analysis, valuation) are strictly reserved for the dedicated "Costs, Margins & Reports" (`ADMIN_COSTS`) workspace.
+- **Interactive 5-Step Process Sequence Stepper:**
+  - Integrated a 5-step sequence bar directly into `TraceabilityAuditWorkspace.tsx`:
+    - **Step 1:** Eingangschargen (Source Lots & Botanical Origin)
+    - **Step 2:** Gebinde / Fässer (Drums, Storage & Conditioning)
+    - **Step 3:** Produktionscharge (Blending Batch & Homogenization)
+    - **Step 4:** Prozesskette & Stationen (Operational Machinery & Processing Telemetry)
+    - **Step 5:** Vorschau & Zertifikat (Executive Origin Certificate & Shipment Preview)
+    - **All Steps:** 6-Column Panoramic Flow view.
+  - Step 5 switches directly to the official Origin Certificate Preview (Donut chart, HonigV § 3 compliance, timeline, source intakes), while Steps 1-4 focus that stage and highlight its cards.
+- **Operational Station Telemetry Strip (Admin Mode):**
+  - Surfaced the full physical equipment route across 6 stations:
+    1. **Dock WE (Wareneingang):** Real supplier legal name (`BioImker Sp. z o.o.`), lot number, delivery date, QSI report details.
+    2. **Wärmekammern CAB-01 / CAB-02:** Decrystallisation at 42.0 °C, slot assignment, dwell time (24–36 h), drum locations.
+    3. **Filtration FLT-01:** Stainless steel sieve (200 µm mesh), operator name, process loss kg.
+    4. **Mischbehälter MIX-01 & Reifetank TANK-01:** Recipe homogenization, rework additions, agitation parameters.
+    5. **Abfülllinie QUIEL_PET / CARLO_JAR:** Packaging formats, filling line operator, line speed, net kg filled.
+    6. **Versand-Dock OUT:** Real customer legal entity (`EDEKA Zentrale Stiftung & Co. KG`), destination country, shipment lot number.
+- **Operational Route Step Inspector Modal (`OperationalInspectionModalState`):**
+  - Clicking any card or station in Staff/Admin mode opens an in-depth operational inspector displaying:
+    - Station category badge and equipment/machine code.
+    - Operator in charge and role status.
+    - DIN 1333 mass balance ledger: In kg, Out kg, Loss kg, and Rework generated kg.
+    - Technical telemetry (Temperature in °C, Filter micron rating in µm).
+    - Legal counterparties and GoBD audit trail anchor.
+  - In Inspector view, clicking cards retains the approved masked behavior, filtering the GoBD stock movement ledger without exposing proprietary plant secrets or personnel names.
+- **Multi-Language Regulatory Dictionary:** Added 22 new bilingual keys across German (DE), English (EN), Turkish (TR), and Bengali (BN) in `shared/src/schemas/formatters-de.ts`.
+- **Validation:**
+  - Client production build passed: `tsc -b && vite build` (0 errors, 8.06s).
+  - Server build passed: `tsc` (0 errors).
+  - All 15 server Jest suites and 57 unit/integration tests passed in 17.48s.
+
 ## RULES  for  BURAMLOOP AI DEVELOPMENT
 
 1. Inspect existing code before proposing changes.
