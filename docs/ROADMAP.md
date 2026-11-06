@@ -291,9 +291,9 @@ no development credentials, and business owners sign off the workflows.
 - Barcode lookup (GET /api/v1/stock/barcode/:code) and Zebra ZPL generation (GET /api/v1/stock/drums/:id/zpl-label) are mounted in the stock router. The mobile camera barcode scanner and OCR are integrated with warehouse intake.
 
 
-- The app has 11 distinct sidebar destinations with separated Warm Cabinets and Batch Planning workspaces, a 5-tab Master Data workspace, an Admin user management directory with update/deactivation/password-reset UI, and live notification and stock movement feeds.
+- The app has 12 distinct sidebar destinations with separated Warm Cabinets and Batch Planning workspaces, a 5-tab Master Data workspace, an Admin user management directory with dynamic role creation and module permissions matrix (BL-060), dynamic operational telemetry badges on the sidebar (BL-059), and dual-route product traceability (BL-057/BL-058).
 
-  Admin costs and trace/audit are API-backed following ctx-v53; the sourcing
+  Admin costs and trace/audit are API-backed following ctx-v53/ctx-v70/ctx-v74; the sourcing
   board is API-backed following ctx-v54, while other
   standalone views still need review for static fixtures and offline fallback.
 - Authentication/session restoration and logout are wired. Self-service

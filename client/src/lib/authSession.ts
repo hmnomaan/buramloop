@@ -26,7 +26,9 @@ const ROLE_CODES: Record<string, UserRole> = {
 
 export function toUserSession(user: ApiAuthUser): UserSession {
   const roleName = user.role ?? user.roleName;
-  const role = roleName ? ROLE_CODES[roleName.toUpperCase()] : undefined;
+  const role = roleName
+    ? (ROLE_CODES[roleName.toUpperCase()] || (roleName as UserRole))
+    : undefined;
   const id = user.id ?? user._id ?? user.userId;
 
   if (!id || !user.email || !role || !Array.isArray(user.permissions)) {

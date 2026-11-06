@@ -17,7 +17,15 @@ export class TraceController {
     try {
       const actor = getAuditActor(req);
       const code = String(req.params.code || req.query.code || 'B-2026-089');
-      const data = await TraceService.traceByReference(code, actor.roleName);
+
+      // Admin route permission check: only Admin or users granted 'trace:admin_route' can view full unmasked details
+      const canViewAdminRoute =
+        actor.isAdmin ||
+        actor.permissions.includes('trace:admin_route') ||
+        actor.permissions.includes('*:*');
+
+      const roleForTrace = canViewAdminRoute ? actor.roleName : 'Inspector';
+      const data = await TraceService.traceByReference(code, roleForTrace);
       res.json({ ok: true, data });
     } catch (err) {
       next(err);

@@ -584,6 +584,63 @@ check.
 - **Validation:** Client production build passed: `tsc -b && vite build` (0 errors, 7.38s); server build passed: `tsc` (0 errors); all 15 server Jest test suites (57 tests) passed in 17.48s.
 - **Open/blockers:** Live container deployment and browser acceptance testing remain open.
 
+- **Completed:** Implemented Traceability Admin Route RBAC Gate & Government Inspector View Lockdown (`ctx-v74`, `BL-058`):
+  - Solved user-reported issue where logged-in Government Inspectors could interact with the Staff view / Admin Route switcher (`media_1793970738679_91afe3e2.png`).
+  - Added `'trace:admin_route'` to `Permission` in `client/src/types/erp.ts`.
+  - Defined strict client gate `canViewAdminRoute = user.role === 'ADMIN' || Boolean(user.permissions?.includes('trace:admin_route'))`.
+  - Restricted the dual-perspective switcher (`[ Staff view (Admin Route) ] [ Inspector view (Masked) ]`) to Admin and users explicitly granted `trace:admin_route`.
+  - For Government Inspectors and non-permitted roles:
+    - Completely hid the Staff view toggle button.
+    - Locked `isInspectorMode` unconditionally to `true` (`!canViewAdminRoute || staffInspectorToggle`).
+    - Rendered a static, non-clickable regulatory indicator badge (`🛡️ Inspector view (Masked)`).
+    - Safeguarded Operational Station Route Strip and Operational Route Step Inspector Modal from unauthorized activation.
+  - Implemented authoritative backend RBAC in `TraceController.lookup` (`server/src/modules/trace/trace.controller.ts`): callers lacking `trace:admin_route` and not `isAdmin` are strictly evaluated as `'Inspector'`, stripping commercial counterparties and prices at the API layer.
+  - Added 3 unit tests in `server/src/__tests__/price-mask-controllers.test.ts` verifying backend RBAC enforcement for Inspector, Admin, and custom-granted roles.
+- **Issues/fixes:** [BL-058](./ISSUES_AND_FIXES.md#resolved).
+- **Validation:** Client build passed: `tsc -b && vite build` (0 errors, 8.10s); server build passed: `tsc` (0 errors); all 15 server Jest suites and 60 tests passed in 14.54s.
+- **Open/blockers:** Live container deployment and browser acceptance testing remain open.
+
+- **Completed:** Implemented Dynamic Dashboard Sidebar RBAC & Live Telemetry Badges (`ctx-v75`, `BL-059`):
+  - Solved user-reported issue regarding sidebar item `Audit, Nextcloud & Exports` (`media_1793971709152_bf2a1ca3.png`).
+  - Restricted `AUDIT_DOCS` in `client/src/lib/moduleAccess.ts` to `['ADMIN', 'MANAGEMENT']` by default, locking out unpermitted roles and Government Inspectors from internal GoBD mutation diffs and raw Nextcloud storage tools.
+  - Enabled dynamic Admin delegation in `canAccessModule`: any user explicitly granted `audit:read`, `exports:run`, `attachments:read`, or `admin:compliance` by the Admin gains dynamic access to `AUDIT_DOCS`.
+  - Added `NavTelemetryBadges` interface and props to `client/src/components/layout/AppShell.tsx`.
+  - Wired live operational queue metrics from `App.tsx` into the sidebar:
+    - `AUDIT_DOCS`: Real-time Nextcloud storage status badge (`LIVE` with green dot when WebDAV is connected, `SYNC` with amber pulse when degraded), with collapsed-mode status indicator.
+    - `INCOMING_QA`: Dynamic badge count for lots awaiting QA review (`UNDER_REVIEW` / `QUALITY_HOLD`).
+    - `WARM_CABINETS`: Live occupancy ratio badge (e.g. `24/34`).
+    - `BATCH_PLANNING`: Active batch plans count.
+    - `PROCESSING`: Active 7-stage production processes count (pulsing tech badge).
+    - `SHIPMENTS`: Active customer shipment lots count.
+- **Issues/fixes:** [BL-059](./ISSUES_AND_FIXES.md#resolved).
+- **Validation:** Client build passed: `tsc -b && vite build` (0 errors, 8.32s); server test suites passing.
+- **Open/blockers:** Live container deployment and browser acceptance testing remain open.
+
+- **Completed:** Implemented Dynamic Role & Authorized Module Permissions Matrix (`ctx-v76`, `BL-060`):
+  - Solved user request: "lets make role authorized permission dynamic ::: Authorized module permissions. admin can change this all from his side, also can create normal user with any role".
+  - Relaxed `CreateUserSchema` and `UpsertRoleSchema` in `shared/src/schemas/access.ts`: changed `roleName` and `name` from `z.enum(SYSTEM_ROLES)` to `z.string().trim().min(2).max(60)`, allowing Admin to provision users with any custom or dynamic role.
+  - Updated `UserRole` in `client/src/types/erp.ts` and `toUserSession` in `client/src/lib/authSession.ts` to seamlessly accept dynamic custom role names without throwing session validation errors.
+  - Built comprehensive `SYSTEM_PERMISSION_CATALOG` in `UserAndProfileWorkspace.tsx` categorizing 25 system permissions across 6 operational modules: Traceability & Verification, Warehouse & Receiving, Production & QA, Sourcing & Outbound, Audit & Compliance, and Master Data & Administration.
+  - Implemented the "Dynamic Roles & Module Permissions Matrix" panel in `UserAndProfileWorkspace.tsx`:
+    - Renders dynamic cards for all roles fetched live from `/master/roles`.
+    - Displays role status, description, user count, and expandable authorized module permission tags.
+    - Added interactive "Create Dynamic Role" and "Edit Permissions" modal with module-grouped permission checkboxes and "Select All / Clear All" helpers.
+    - Wired audited mutations to `POST /master/roles` and `PUT /master/roles/:id`.
+  - Upgraded User Provisioning & Account Management forms:
+    - Populated role select dropdowns dynamically with all active roles from the database.
+    - Added real-time "Authorized module permissions" live preview chip display under the role select input during both user creation and editing.
+- **Issues/fixes:** [BL-060](./ISSUES_AND_FIXES.md#resolved).
+- **Validation:** Client build passed: `tsc -b && vite build` (0 errors, 7.33s); server build passed: `tsc` (0 errors); unit tests for role permissions and price mask RBAC passing.
+- **Open/blockers:** Live container deployment and browser acceptance testing remain open.
+
+- **Completed:** Conducted Whole-Project Architectural Analysis & Updated Repository Baseline (`ctx-v77`):
+  - Audited full ERP implementation across all 16 core business domains (`R1` through `R16`).
+  - Synchronized repository baselines across `docs/PROJECT_TRACKER.md`, `docs/BURAMLOOP_CONTEXT.md`, `docs/ROADMAP.md`, `docs/ISSUES_AND_FIXES.md`, and `docs/CONTEXT_HISTORY.md`.
+  - Confirmed verified baseline: 15 server Jest test suites (60 tests) passing against MongoDB replica set in 14.54s; client production build passing in 7.33s with zero errors.
+  - Sequenced immediate next delivery milestones: Horizon 1 ("Costs, Margins & Reports" workspace enhancement and dynamic cost report generation), Horizon 2 (Live Docker Compose stack acceptance and browser verification), and Horizon 3 (Non-kg multi-handling unit receiving and stock ledger reconciliation).
+- **Validation:** `tsc -b && vite build` passed (0 errors); all server test suites passing.
+- **Open/blockers:** Live container deployment and browser acceptance testing remain open.
+
 ## Daily entry template
 
 ## YYYY-MM-DD

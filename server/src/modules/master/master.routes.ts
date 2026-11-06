@@ -28,6 +28,7 @@ const UpsertRoleBodySchema = z.object({
   name: z.string().trim().min(2).max(60),
   description: z.string().trim().max(300).default(''),
   permissions: z.array(z.string()).default([]),
+  isActive: z.boolean().optional(),
   reason: ReasonSchema,
 });
 

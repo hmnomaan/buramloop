@@ -869,6 +869,90 @@ and [roadmap](./ROADMAP.md) for active status.*
   - Server build passed: `tsc` (0 errors).
   - All 15 server Jest suites and 57 unit/integration tests passed in 17.48s.
 
+## ctx-v74 — Traceability Admin Route RBAC Gate & Inspector Lockdown (`BL-058`) (2026-11-06)
+
+- **RBAC Definition & Permission Extension:**
+  - Added `'trace:admin_route'` to `Permission` in `client/src/types/erp.ts`.
+  - Defined access rule: Staff view / Admin Route is strictly restricted to `user.role === 'ADMIN'` or any user explicitly granted the `'trace:admin_route'` permission by Admin.
+- **Client Lockdown & Perspective Guarding (`TraceabilityAuditWorkspace.tsx`):**
+  - Evaluated `canViewAdminRoute = user.role === 'ADMIN' || Boolean(user.permissions?.includes('trace:admin_route'))`.
+  - Dual-perspective switcher (`[ Staff view (Admin Route) ] [ Inspector view (Masked) ]`) is rendered exclusively when `canViewAdminRoute` is true.
+  - When `!canViewAdminRoute` (e.g. `user.role === 'INSPECTOR'`):
+    - Staff view button is completely hidden from the DOM.
+    - Rendered a static, read-only regulatory indicator badge: `🛡️ Inspector view (Masked)`.
+    - Client state `isInspectorMode` is locked to `(!canViewAdminRoute || staffInspectorToggle)`, preventing client-side toggle tampering.
+    - Operational Station Route Strip and deep Operational Route Step Inspector Modal are completely inaccessible.
+- **Server-Side Authoritative RBAC Protection (`TraceController.lookup`):**
+  - In `server/src/modules/trace/trace.controller.ts`, evaluated `actor.isAdmin || actor.permissions.includes('trace:admin_route') || actor.permissions.includes('*:*')`.
+  - Non-authorized actors (including Government Inspectors) are forced to `roleForTrace = 'Inspector'`, stripping counterparties, internal machine telemetry, and commercial pricing at the API layer.
+- **Test Coverage:**
+  - Added 3 unit tests in `server/src/__tests__/price-mask-controllers.test.ts` verifying:
+    1. Inspector without `trace:admin_route` forces `'Inspector'` trace mode.
+    2. Admin actor passes `'ADMIN'`.
+    3. User with custom `trace:admin_route` permission can view admin route data.
+- **Validation:**
+  - Client production build: `tsc -b && vite build` passed (0 errors, 8.10s).
+  - Server build: `tsc` passed (0 errors).
+  - All 15 server Jest suites and 60 tests passed in 14.54s.
+
+## ctx-v75 — Dynamic Dashboard Sidebar RBAC & Live Telemetry Badges (`BL-059`) (2026-11-06)
+
+- **Dynamic RBAC & Role-Aware Sidebar Navigation:**
+  - Resolved `Audit, Nextcloud & Exports` exposure in `client/src/lib/moduleAccess.ts`:
+    - Updated `AUDIT_DOCS` access from `ALL_ROLES` to `['ADMIN', 'MANAGEMENT']` with explicit permissions `['audit:read', 'exports:run', 'attachments:read', 'admin:compliance']`.
+    - Government Inspectors and unauthorized operators are locked out of company-wide GoBD mutation diffs and raw Nextcloud storage tools.
+    - Updated `canAccessModule` with dynamic Admin delegation: any user explicitly granted a module permission by Admin gains dynamic access to that workspace.
+- **Dynamic Telemetry & Live Operational Badges (`AppShell.tsx` & `App.tsx`):**
+  - Created `NavTelemetryBadges` interface in `AppShell.tsx` and wired live reactive state from `App.tsx`:
+    - **`AUDIT_DOCS`:** Real-time Nextcloud WebDAV status chip (`LIVE` with green dot when connected, `SYNC` with amber pulse when degraded). Features a collapsed-mode notification dot directly on the icon.
+    - **`INCOMING_QA`:** Dynamic badge count for lots awaiting QA review (`UNDER_REVIEW` / `QUALITY_HOLD`).
+    - **`WARM_CABINETS`:** Dynamic occupancy ratio chip (e.g. `24/34`).
+    - **`BATCH_PLANNING`:** Dynamic count of active/pending batches.
+    - **`PROCESSING`:** Dynamic pulsing badge for active 7-stage production processes.
+    - **`SHIPMENTS`:** Dynamic count of active customer shipment lots.
+- **Validation:**
+  - Client production build: `tsc -b && vite build` passed (0 errors, 8.32s).
+  - All server unit and integration test suites passing.
+
+## ctx-v76 — Dynamic Role & Authorized Module Permissions Matrix (`BL-060`) (2026-11-06)
+
+- **Dynamic Role Creation & Zod Schema Relaxations:**
+  - Relaxed `CreateUserSchema` and `UpsertRoleSchema` in `shared/src/schemas/access.ts`: replaced `z.enum(SYSTEM_ROLES)` with `z.string().trim().min(2).max(60)`, allowing Admin to provision users with any custom or dynamically created role while maintaining mandatory `expiresAt` validation for Inspector roles.
+  - Updated `UserRole` in `client/src/types/erp.ts` and `toUserSession` in `client/src/lib/authSession.ts` to seamlessly handle dynamic custom role names without throwing session validation errors.
+  - Added `isActive: z.boolean().optional()` to `UpsertRoleBodySchema` in `server/src/modules/master/master.routes.ts`.
+- **System Permission Catalog & Module Grouping:**
+  - Defined `SYSTEM_PERMISSION_CATALOG` in `UserAndProfileWorkspace.tsx` categorizing 25 system permissions across 6 operational modules:
+    1. **Traceability & Verification:** `trace:read`, `trace:admin_route`, `trace:inspect`.
+    2. **Warehouse & Receiving:** `stock:read`, `stock:write`, `warmroom:read`, `warmroom:write`.
+    3. **Production & QA:** `batches:read`, `batches:write`, `batches:approve`, `processing:read`, `processing:write`, `rework:read`, `rework:write`, `qa:approve`, `qa:inspect`.
+    4. **Sourcing & Outbound:** `sourcing:read`, `sourcing:write`, `management:approve`, `contracts:write`, `shipments:read`, `shipments:write`.
+    5. **Audit, Compliance & Nextcloud:** `audit:read`, `exports:run`, `attachments:read`, `attachments:write`, `admin:compliance`.
+    6. **Master Data & Administration:** `master:read`, `master:write`, `admin:master_data`, `admin:costs`, `roles:read`, `*:*`.
+- **Dynamic Roles & Module Permissions Matrix Panel:**
+  - Created an interactive administration panel in `UserAndProfileWorkspace.tsx`:
+    - Loads roles dynamically from `GET /master/roles`.
+    - Renders cards displaying role name, system/custom badge, description, assigned user count, and expandable authorized module permission tags.
+    - Added "+ Create Dynamic Role" and "Edit permissions" modal with module-grouped permission checkboxes and "Select All / Clear All" helpers.
+    - Wired audited mutations via `apiClient.auditedMutation` to `POST /master/roles` and `PUT /master/roles/:id`.
+- **User Provisioning with Dynamic Permissions Live Preview:**
+  - In user creation and management forms, populated role select dropdowns dynamically with all active roles from MongoDB.
+  - Added real-time "Authorized module permissions" live preview chip display under the role select input, enabling Admin to inspect exactly which module permissions a user will receive before creating or updating their account.
+- **Validation:**
+  - Client production build: `tsc -b && vite build` passed (0 errors, 7.33s).
+  - Server build: `tsc` passed (0 errors).
+  - Unit tests for role permissions and price mask RBAC passing.
+
+## ctx-v77 — Whole-Project Architectural Audit & Roadmap Synchronization (2026-11-06)
+
+- **Comprehensive System Audit across R1–R16:**
+  - Audited full operational flow from gated sourcing leads through exact-weight package receiving, warm room dwell cycles (2×17), 6,000 kg batch recipe planning with rework heel priority, 7-stage homogenization, customer shipment LOTs, dual product traceability (DIN 1333 / DIN 5008 in 4 languages), IFS Food v8 instant regulatory hold, decoupled GoBD audit center (`AUDIT_DOCS`), dynamic sidebar telemetry badges, and server-authoritative dynamic RBAC matrix (`BL-060`).
+- **Documentation Baseline Synchronization:**
+  - Updated [`PROJECT_TRACKER.md`](./PROJECT_TRACKER.md), [`BURAMLOOP_CONTEXT.md`](./BURAMLOOP_CONTEXT.md), [`ROADMAP.md`](./ROADMAP.md), and [`DAILY_LOG.md`](./DAILY_LOG.md) reflecting 15 server Jest suites (60 tests) passing and zero-error client production build (7.33s).
+- **Sequenced Next Delivery Priorities:**
+  - **Horizon 1:** Enhance "Costs, Margins & Reports" (`ADMIN_COSTS`) workspace with dynamic batch cost calculation, margin breakdown (EUR/kg), and Nextcloud PDF report generation.
+  - **Horizon 2:** Execute live Docker Compose stack verification (`docker compose up -d`) and end-to-end browser smoke test.
+  - **Horizon 3:** Non-kg material sourcing and multi-handling unit receiving.
+
 ## RULES  for  BURAMLOOP AI DEVELOPMENT
 
 1. Inspect existing code before proposing changes.

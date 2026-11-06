@@ -5,7 +5,8 @@ export type UserRole =
   | 'QA_LEAD'
   | 'PLANT_OPERATOR'
   | 'WAREHOUSE'
-  | 'INSPECTOR';
+  | 'INSPECTOR'
+  | (string & {});
 
 export type Permission =
   | 'management:approve'
@@ -15,6 +16,7 @@ export type Permission =
   | 'qa:inspect'
   | 'production:execute'
   | 'trace:inspect'
+  | 'trace:admin_route'
   | 'export:generate';
 
 export interface UserSession {

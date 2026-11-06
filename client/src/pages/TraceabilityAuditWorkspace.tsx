@@ -211,9 +211,14 @@ export const TraceabilityAuditWorkspace: React.FC<{
   const [lang, setLang] = useState<InspectionLanguage>('DE');
   const [viewMode, setViewMode] = useState<TraceViewMode>('CHAIN_EXPLORER');
   const [activeStageFilter, setActiveStageFilter] = useState<StepperStage>('ALL');
-  const [isInspectorMode, setIsInspectorMode] = useState<boolean>(
-    user.role === 'INSPECTOR'
-  );
+  
+  // Admin Route RBAC Gate: Only ADMIN or users explicitly granted 'trace:admin_route' can view full route
+  const canViewAdminRoute =
+    user.role === 'ADMIN' ||
+    Boolean(user.permissions?.includes('trace:admin_route'));
+  const [staffInspectorToggle, setStaffInspectorToggle] = useState<boolean>(false);
+  const isInspectorMode = !canViewAdminRoute || staffInspectorToggle;
+
   const [queryCode, setQueryCode] = useState<string>('');
   const [suggestedCodes, setSuggestedCodes] = useState<string[]>([]);
   const [traceData, setTraceData] = useState<ServerTraceResponse | null>(null);
@@ -498,31 +503,38 @@ export const TraceabilityAuditWorkspace: React.FC<{
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
-          {/* Dual-Perspective Switcher: Staff view | Inspector view (Masked) */}
-          <div className="inline-flex rounded-lg bg-buram-surface p-1 border border-buram-border font-mono text-xs max-w-full overflow-x-auto">
-            <button
-              type="button"
-              onClick={() => setIsInspectorMode(false)}
-              className={`px-2.5 sm:px-3 py-1.5 rounded transition-colors whitespace-nowrap ${
-                !isInspectorMode
-                  ? 'bg-buram-elevated text-buram-gold font-bold shadow-sm'
-                  : 'text-buram-muted hover:text-buram-text'
-              }`}
-            >
-              {t.staffViewBtn}
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsInspectorMode(true)}
-              className={`px-2.5 sm:px-3 py-1.5 rounded transition-colors whitespace-nowrap ${
-                isInspectorMode
-                  ? 'bg-buram-amber text-buram-bg font-bold shadow-sm'
-                  : 'text-buram-muted hover:text-buram-text'
-              }`}
-            >
-              {t.inspectorViewBtn}
-            </button>
-          </div>
+          {/* Perspective Switcher: Staff view (Admin Route) only for ADMIN or users with trace:admin_route. Inspectors see locked regulatory badge */}
+          {canViewAdminRoute ? (
+            <div className="inline-flex rounded-lg bg-buram-surface p-1 border border-buram-border font-mono text-xs max-w-full overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setStaffInspectorToggle(false)}
+                className={`px-2.5 sm:px-3 py-1.5 rounded transition-colors whitespace-nowrap ${
+                  !isInspectorMode
+                    ? 'bg-buram-elevated text-buram-gold font-bold shadow-sm'
+                    : 'text-buram-muted hover:text-buram-text'
+                }`}
+              >
+                {t.staffViewBtn}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStaffInspectorToggle(true)}
+                className={`px-2.5 sm:px-3 py-1.5 rounded transition-colors whitespace-nowrap ${
+                  isInspectorMode
+                    ? 'bg-buram-amber text-buram-bg font-bold shadow-sm'
+                    : 'text-buram-muted hover:text-buram-text'
+                }`}
+              >
+                {t.inspectorViewBtn}
+              </button>
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-buram-surface border border-buram-border font-mono text-xs text-buram-amber shadow-sm">
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-buram-amber" />
+              <span className="font-bold">{t.inspectorViewBtn}</span>
+            </div>
+          )}
 
           {/* 4-Language Switcher (DE | TR | EN | BN) */}
           <div className="inline-flex rounded-lg bg-buram-elevated border border-buram-border p-1 font-mono text-xs">
@@ -2094,7 +2106,7 @@ export const TraceabilityAuditWorkspace: React.FC<{
       )}
 
       {/* OPERATIONAL ROUTE STEP & ENTITY INSPECTOR MODAL (ADMIN DEEP DIVE) */}
-      {operationalModal.isOpen && (
+      {operationalModal.isOpen && canViewAdminRoute && !isInspectorMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in font-mono text-xs">
           <div className="w-full max-w-2xl bg-buram-surface border border-buram-amber/60 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             {/* Modal Header */}

@@ -8,23 +8,138 @@ import {
   UserPlus,
   UserRound,
   X,
+  CheckSquare,
+  Square,
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  Shield,
+  Layers,
+  Sparkles,
 } from 'lucide-react';
 import { apiClient } from '../lib/apiClient';
 import { UserSession } from '../types/erp';
 import { InfoPopoverButton } from '../components/ui/FlowAndInfoPrimitives';
 import { ReasonDialog, StatusBadge } from '../components/ui/IndustrialPrimitives';
 
-type DirectoryUser = {
+export type DirectoryUser = {
   _id: string;
   email: string;
   fullName: string;
   isActive: boolean;
   mustChangePassword: boolean;
-  roleId: { _id?: string; name: string } | string;
+  roleId: { _id?: string; name: string; permissions?: string[] } | string;
   createdAt: string;
 };
 
-const ROLES = ['Admin', 'Management', 'QA', 'Warehouse', 'Production', 'Inspector'] as const;
+export interface RoleItem {
+  _id: string;
+  name: string;
+  description?: string;
+  permissions: string[];
+  isSystem?: boolean;
+  isActive?: boolean;
+  createdAt?: string;
+}
+
+export interface PermissionModuleGroup {
+  moduleName: string;
+  category: string;
+  description: string;
+  permissions: Array<{
+    key: string;
+    label: string;
+    description: string;
+  }>;
+}
+
+export const SYSTEM_PERMISSION_CATALOG: PermissionModuleGroup[] = [
+  {
+    moduleName: 'Traceability & Verification',
+    category: 'TRACE',
+    description: 'Product provenance, physical route inspection, and regulatory hold actions',
+    permissions: [
+      { key: 'trace:read', label: 'Traceability Explorer', description: 'Access product genealogy, lots, and origin certificates' },
+      { key: 'trace:admin_route', label: 'Admin Route & Staff View', description: 'Unmask counterparties, plant telemetry, and machine route' },
+      { key: 'trace:inspect', label: 'Regulatory Inspection', description: 'Perform official regulatory checks and IFS hold reviews' },
+    ],
+  },
+  {
+    moduleName: 'Warehouse & Receiving',
+    category: 'WAREHOUSE',
+    description: 'Dock receipt, barcode scanning, warm room, and append-only stock ledger',
+    permissions: [
+      { key: 'stock:read', label: 'Stock & Ledger Read', description: 'View real-time honey stock, drums, and movement logs' },
+      { key: 'stock:write', label: 'Lot Intake & Barcodes', description: 'Receive incoming lots, assign barcodes, and record movement' },
+      { key: 'warmroom:read', label: 'Warm Cabinets View', description: 'Monitor 2x17 warm room slots and temperature dwell times' },
+      { key: 'warmroom:write', label: 'Warm Cabinet Check-In/Out', description: 'Check in drums to warming and transfer to filtration' },
+    ],
+  },
+  {
+    moduleName: 'Production & Quality Assurance',
+    category: 'PRODUCTION',
+    description: 'Blend recipes, 7-stage processing, rework heels, and sensory testing',
+    permissions: [
+      { key: 'batches:read', label: 'Batch Plans View', description: 'View 6,000 kg blend recipes and feasibility calculations' },
+      { key: 'batches:write', label: 'Batch Planning & Lock', description: 'Select drums/rework, simulate feasibility, and lock recipes' },
+      { key: 'batches:approve', label: 'Batch QA Approval', description: 'Approve batch recipes for production execution' },
+      { key: 'processing:read', label: 'Process Steps View', description: 'Review 7-stage homogenization and filling line runs' },
+      { key: 'processing:write', label: 'Execute 7-Stage Process', description: 'Advance filtration, mixing, resting, and packaging stages' },
+      { key: 'rework:read', label: 'Rework Inventory View', description: 'Inspect rework stock heels and botanical composition' },
+      { key: 'rework:write', label: 'Rework Heel Creation', description: 'Log process leftovers and drum rework allocations' },
+      { key: 'qa:approve', label: 'QA In-House Sensory Release', description: 'Gate incoming lot testing and final shipment release' },
+      { key: 'qa:inspect', label: 'QA Lab Inspection', description: 'Enter sensory scores and attach QSI lab certificates' },
+    ],
+  },
+  {
+    moduleName: 'Sourcing & Outbound Shipments',
+    category: 'COMMERCIAL',
+    description: 'Gated supplier offers, procurement contracts, and customer dispatch LOTs',
+    permissions: [
+      { key: 'sourcing:read', label: 'Sourcing Pipeline View', description: 'Inspect supplier offers and gated sourcing pipeline' },
+      { key: 'sourcing:write', label: 'Create Offers & Lots', description: 'Submit supplier lots, pricing, and volume offers' },
+      { key: 'management:approve', label: 'Commercial Approvals', description: 'Approve contracts and authorize price overrides' },
+      { key: 'contracts:write', label: 'Contract Execution', description: 'Draft and finalize legal procurement contracts' },
+      { key: 'shipments:read', label: 'Customer Shipments View', description: 'View dispatched customer orders and destination LOTs' },
+      { key: 'shipments:write', label: 'Create & Dispatch LOTs', description: 'Generate customer shipment lots and dispatch orders' },
+    ],
+  },
+  {
+    moduleName: 'Audit, Compliance & Nextcloud',
+    category: 'GOVERNANCE',
+    description: 'GoBD mutation trail, CSV exports, and Nextcloud WebDAV document archives',
+    permissions: [
+      { key: 'audit:read', label: 'GoBD Audit Trail View', description: 'Inspect immutable before/after diffs and event history' },
+      { key: 'exports:run', label: 'CSV & Ledger Exports', description: 'Export GoBD movement ledger and compliance data' },
+      { key: 'attachments:read', label: 'Nextcloud Document Vault', description: 'Download lab reports, OCR labels, and certificates' },
+      { key: 'attachments:write', label: 'Document Uploads', description: 'Upload lab certificates and scanned label assets' },
+      { key: 'admin:compliance', label: 'Compliance Governance', description: 'Manage cross-module compliance and regulatory holds' },
+    ],
+  },
+  {
+    moduleName: 'Master Data & Administration',
+    category: 'ADMIN',
+    description: 'Master catalogs, costs & margins, roles, and universal wildcard control',
+    permissions: [
+      { key: 'master:read', label: 'Master Data Read', description: 'View suppliers, materials, and quality grades' },
+      { key: 'master:write', label: 'Master Data Write', description: 'Create and edit suppliers, honey materials, and grades' },
+      { key: 'admin:master_data', label: 'Admin Master Data Control', description: 'Master catalog administration and counter overrides' },
+      { key: 'admin:costs', label: 'Costs & Margins Access', description: 'View EUR/kg pricing, margin metrics, and valuation' },
+      { key: 'roles:read', label: 'Roles & Directory View', description: 'View user directory and system role definitions' },
+      { key: '*:*', label: 'Super Administrator', description: 'Universal wildcard access across all platform modules' },
+    ],
+  },
+];
+
+const DEFAULT_FALLBACK_ROLES: RoleItem[] = [
+  { _id: 'admin', name: 'Admin', description: 'Full system access including pricing and master overrides', permissions: ['*:*'], isSystem: true, isActive: true },
+  { _id: 'management', name: 'Management', description: 'Approves external analysis, reviews batch feasibility and cost reports', permissions: ['management:approve', 'management:view', 'sourcing:read', 'stock:read', 'batches:read', 'batches:approve', 'shipments:read', 'reports:read', 'trace:read', 'exports:run'], isSystem: true, isActive: true },
+  { _id: 'qa', name: 'QA', description: 'In-house sensory + QSI lab verification, lot PASS/FAIL gating', permissions: ['sourcing:read', 'qa:approve', 'stock:read', 'batches:read', 'shipments:read', 'attachments:write', 'attachments:read', 'trace:read', 'exports:run'], isSystem: true, isActive: true },
+  { _id: 'warehouse', name: 'Warehouse', description: 'Incoming lot receipt, drum listing, warm cabinet check IN/OUT', permissions: ['stock:read', 'stock:write', 'warmroom:read', 'warmroom:write', 'attachments:read', 'attachments:write', 'exports:run'], isSystem: true, isActive: true },
+  { _id: 'production', name: 'Production', description: 'Warm cabinet check OUT, filtration, blending, resting tank, filling, rework', permissions: ['warmroom:write', 'warmroom:read', 'batches:read', 'batches:write', 'processing:write', 'processing:read', 'rework:write', 'rework:read', 'attachments:write', 'attachments:read', 'exports:run'], isSystem: true, isActive: true },
+  { _id: 'inspector', name: 'Inspector', description: 'Government inspection read-only access (masked commercial data)', permissions: ['trace:read', 'stock:read', 'batches:read', 'shipments:read', 'attachments:read', 'exports:run'], isSystem: true, isActive: true },
+];
+
 const inputClass =
   'w-full rounded border border-buram-border bg-buram-bg px-3 py-2 text-sm text-buram-text outline-none focus:border-buram-amber';
 const labelClass = 'mb-1 block text-xs font-mono uppercase tracking-wide text-buram-muted';
@@ -43,6 +158,8 @@ export const UserAndProfileWorkspace: React.FC<{
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [users, setUsers] = useState<DirectoryUser[]>([]);
+  const [roles, setRoles] = useState<RoleItem[]>(DEFAULT_FALLBACK_ROLES);
+  const [isLoadingRoles, setIsLoadingRoles] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isReasonDialogOpen, setIsReasonDialogOpen] = useState(false);
   const [newUser, setNewUser] = useState({
@@ -62,10 +179,60 @@ export const UserAndProfileWorkspace: React.FC<{
   } | null>(null);
   const [isUpdateReasonDialogOpen, setIsUpdateReasonDialogOpen] = useState(false);
 
+  // Dynamic Role Editing & Creation State
+  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
+  const [isCreatingNewRole, setIsCreatingNewRole] = useState(false);
+  const [roleForm, setRoleForm] = useState<{
+    id?: string;
+    name: string;
+    description: string;
+    permissions: string[];
+    isActive: boolean;
+  }>({
+    name: '',
+    description: '',
+    permissions: [],
+    isActive: true,
+  });
+  const [isRoleReasonDialogOpen, setIsRoleReasonDialogOpen] = useState(false);
+  const [expandedRolePermissionsId, setExpandedRolePermissionsId] = useState<string | null>(null);
+
   const isAdmin = user.role === 'ADMIN';
 
   const getRoleName = (roleId: DirectoryUser['roleId']): string =>
     typeof roleId === 'string' ? roleId : roleId?.name ?? 'Unknown';
+
+  const loadRoles = async () => {
+    if (!isAdmin) return;
+    try {
+      setIsLoadingRoles(true);
+      const res = await apiClient.request<RoleItem[]>('/master/roles');
+      if (Array.isArray(res) && res.length > 0) {
+        setRoles(res);
+      }
+    } catch {
+      // Keep default fallback roles if endpoint fails
+    } finally {
+      setIsLoadingRoles(false);
+    }
+  };
+
+  const loadUsers = () => {
+    if (!isAdmin) return;
+    void apiClient
+      .request<DirectoryUser[]>('/auth/users')
+      .then(setUsers)
+      .catch((cause: unknown) =>
+        setError(cause instanceof Error ? cause.message : 'Could not load the user directory.')
+      );
+  };
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadUsers();
+      void loadRoles();
+    }
+  }, [isAdmin]);
 
   const selectAvatar = (file?: File) => {
     setError('');
@@ -87,16 +254,6 @@ export const UserAndProfileWorkspace: React.FC<{
   };
 
   useEffect(() => {
-    if (!isAdmin) return;
-    void apiClient
-      .request<DirectoryUser[]>('/auth/users')
-      .then(setUsers)
-      .catch((cause: unknown) =>
-        setError(cause instanceof Error ? cause.message : 'Could not load the user directory.')
-      );
-  }, [isAdmin]);
-
-  useEffect(() => {
     if (!avatarFile) {
       setAvatarPreviewUrl(null);
       return;
@@ -114,21 +271,24 @@ export const UserAndProfileWorkspace: React.FC<{
     setIsSaving(true);
     try {
       const updated = await apiClient.request<{
-        id: string;
+        userId: string;
         email: string;
         fullName: string;
+        roleName: string;
+        permissions: string[];
         avatarAttachmentId?: string | null;
-      }>('/auth/profile', {
+        mustChangePassword?: boolean;
+      }>('/auth/me/profile', {
         method: 'PATCH',
-        body: JSON.stringify({ fullName }),
+        body: JSON.stringify({ fullName: fullName.trim() }),
       });
       onUserUpdated({
         ...user,
-        id: updated.id,
         name: updated.fullName,
+        permissions: updated.permissions,
         avatarAttachmentId: updated.avatarAttachmentId ?? null,
       });
-      setMessage('Profile saved.');
+      setMessage('Profile updated.');
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not update your profile.');
     } finally {
@@ -139,21 +299,25 @@ export const UserAndProfileWorkspace: React.FC<{
   const uploadAvatar = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!avatarFile) return;
+
     setError('');
     setMessage('');
     setIsSaving(true);
     try {
       const formData = new FormData();
-      formData.set('file', avatarFile);
-      const result = await apiClient.request<{ avatarAttachmentId: string }>(
-        '/auth/profile/avatar',
-        { method: 'POST', body: formData }
-      );
-      onUserUpdated({ ...user, avatarAttachmentId: result.avatarAttachmentId });
+      formData.append('file', avatarFile);
+      const res = await apiClient.request<{ avatarAttachmentId: string }>('/auth/profile/avatar', {
+        method: 'POST',
+        body: formData,
+      });
+      onUserUpdated({
+        ...user,
+        avatarAttachmentId: res.avatarAttachmentId,
+      });
       setAvatarFile(null);
-      setMessage('Profile picture uploaded.');
+      setMessage('Profile picture saved.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not upload the profile picture.');
+      setError(cause instanceof Error ? cause.message : 'Could not upload profile picture.');
     } finally {
       setIsSaving(false);
     }
@@ -163,10 +327,15 @@ export const UserAndProfileWorkspace: React.FC<{
     event.preventDefault();
     setError('');
     setMessage('');
-    if (newPassword !== confirmPassword) {
-      setError('New password and confirmation do not match.');
+    if (newPassword.length < 10) {
+      setError('Password must be at least 10 characters.');
       return;
     }
+    if (newPassword !== confirmPassword) {
+      setError('New passwords do not match.');
+      return;
+    }
+
     setIsSaving(true);
     try {
       await apiClient.request('/auth/change-password', {
@@ -232,7 +401,7 @@ export const UserAndProfileWorkspace: React.FC<{
         expiresAt: '',
       });
       setIsReasonDialogOpen(false);
-      setMessage('User created. They must change their temporary password at first sign-in.');
+      setMessage(`User created with role ${created.roleName}. They must change their temporary password at first sign-in.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not create the user.');
       setIsReasonDialogOpen(false);
@@ -315,6 +484,96 @@ export const UserAndProfileWorkspace: React.FC<{
     }
   };
 
+  // Dynamic Role Management Actions
+  const openCreateRoleModal = () => {
+    setError('');
+    setIsCreatingNewRole(true);
+    setRoleForm({
+      name: '',
+      description: '',
+      permissions: [],
+      isActive: true,
+    });
+    setIsRoleModalOpen(true);
+  };
+
+  const openEditRoleModal = (role: RoleItem) => {
+    setError('');
+    setIsCreatingNewRole(false);
+    setRoleForm({
+      id: role._id,
+      name: role.name,
+      description: role.description || '',
+      permissions: [...role.permissions],
+      isActive: role.isActive ?? true,
+    });
+    setIsRoleModalOpen(true);
+  };
+
+  const togglePermission = (permKey: string) => {
+    setRoleForm((prev) => {
+      const exists = prev.permissions.includes(permKey);
+      const newPerms = exists
+        ? prev.permissions.filter((p) => p !== permKey)
+        : [...prev.permissions, permKey];
+      return { ...prev, permissions: newPerms };
+    });
+  };
+
+  const toggleGroupPermissions = (groupKeys: string[]) => {
+    setRoleForm((prev) => {
+      const allSelected = groupKeys.every((k) => prev.permissions.includes(k));
+      let newPerms: string[];
+      if (allSelected) {
+        newPerms = prev.permissions.filter((p) => !groupKeys.includes(p));
+      } else {
+        const toAdd = groupKeys.filter((k) => !prev.permissions.includes(k));
+        newPerms = [...prev.permissions, ...toAdd];
+      }
+      return { ...prev, permissions: newPerms };
+    });
+  };
+
+  const saveRolePermissions = async (reason: string) => {
+    setError('');
+    setMessage('');
+    setIsSaving(true);
+    try {
+      const endpoint = roleForm.id ? `/master/roles/${roleForm.id}` : '/master/roles';
+      const method = roleForm.id ? 'PUT' : 'POST';
+
+      await apiClient.auditedMutation<RoleItem, Record<string, unknown>>(endpoint, method, {
+        body: {
+          name: roleForm.name.trim(),
+          description: roleForm.description.trim(),
+          permissions: roleForm.permissions,
+          isActive: roleForm.isActive,
+        },
+        reason,
+      });
+
+      await loadRoles();
+      setIsRoleReasonDialogOpen(false);
+      setIsRoleModalOpen(false);
+      setMessage(
+        `Role '${roleForm.name}' saved with ${roleForm.permissions.length} authorized module permissions.`
+      );
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not save role permissions.');
+      setIsRoleReasonDialogOpen(false);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Find selected role's permissions for live form preview
+  const selectedNewUserRole = roles.find(
+    (r) => r.name.toLowerCase() === newUser.roleName.toLowerCase()
+  );
+  const selectedEditingUserRole = editingUser
+    ? roles.find((r) => r.name.toLowerCase() === editingUser.roleName.toLowerCase())
+    : null;
+
   return (
     <div className="mx-auto w-full min-w-0 max-w-6xl space-y-5 sm:space-y-6">
       <header className="flex flex-col items-start justify-between gap-3 border-b border-buram-border pb-4 sm:flex-row sm:items-center">
@@ -328,18 +587,13 @@ export const UserAndProfileWorkspace: React.FC<{
             </span>
             <h1 className="text-lg font-semibold text-buram-text sm:text-xl">Account & profile</h1>
           </div>
-          <InfoPopoverButton
-            ruleCode="R2 / R14"
-            title="Identity, password and role"
-            summary="You can update your own name and password. Administrators create and manage accounts with an audited reason; role permissions remain server-controlled."
-            bullets={[
-              'New accounts must change their temporary password before using the application.',
-              'Password, role, and deactivation updates invalidate existing sessions.',
-              'Profile pictures are private to the account owner and Admin.',
-            ]}
-          />
         </div>
-        <div className="max-w-full">
+        <div className="flex flex-wrap items-center gap-2">
+          <InfoPopoverButton
+            title="Profile & Access Control"
+            ruleCode="R2/R14"
+            summary="You can update your own name and password. Administrators provision accounts, customize dynamic roles, and configure authorized module permissions with GoBD audit logs."
+          />
           <StatusBadge label={`ACTIVE ROLE: ${user.role}`} variant="NOMINAL" />
         </div>
       </header>
@@ -350,10 +604,12 @@ export const UserAndProfileWorkspace: React.FC<{
           <span>Change your temporary password to finish setting up your account.</span>
         </div>
       )}
+
+      {/* Reason Dialogs */}
       <ReasonDialog
         isOpen={isReasonDialogOpen}
         title={`Create ${newUser.roleName} account`}
-        actionSummary={`Create ${newUser.name || 'the new user'} (${newUser.email || 'email not entered'}) with a temporary password. They must change it at first sign-in.`}
+        actionSummary={`Create ${newUser.name || 'the new user'} (${newUser.email || 'email not entered'}) with role ${newUser.roleName}. They must change temporary password at first sign-in.`}
         confirmLabel="Create audited account"
         isSubmitting={isSaving}
         onCancel={() => setIsReasonDialogOpen(false)}
@@ -374,6 +630,16 @@ export const UserAndProfileWorkspace: React.FC<{
         onCancel={() => setIsUpdateReasonDialogOpen(false)}
         onConfirm={updateDirectoryUser}
       />
+      <ReasonDialog
+        isOpen={isRoleReasonDialogOpen}
+        title={`${isCreatingNewRole ? 'Create Dynamic Role' : 'Update Role Permissions'}: ${roleForm.name}`}
+        actionSummary={`Commit ${roleForm.permissions.length} authorized module permission(s) for role '${roleForm.name}'. All users assigned this role will inherit updated permissions immediately.`}
+        confirmLabel="Commit audited role permissions"
+        isSubmitting={isSaving}
+        onCancel={() => setIsRoleReasonDialogOpen(false)}
+        onConfirm={saveRolePermissions}
+      />
+
       {error && (
         <p role="alert" className="rounded border border-buram-critical/40 p-3 text-sm text-buram-critical">
           {error}
@@ -385,38 +651,31 @@ export const UserAndProfileWorkspace: React.FC<{
         </p>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <section className="min-w-0 space-y-5 rounded-lg border border-buram-border bg-buram-surface p-4 shadow-panel sm:p-5">
-          <h2 className="font-mono text-sm uppercase tracking-wider text-buram-gold">
-            Personal identity & permissions
-          </h2>
-          <div className="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-buram-amber bg-buram-amber/15 font-semibold text-buram-gold">
+      {/* PERSONAL PROFILE SECTION */}
+      <div className="grid gap-5 md:grid-cols-2">
+        <section className="min-w-0 space-y-4 rounded-lg border border-buram-border bg-buram-surface p-4 sm:p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-buram-text">Personal identity & permissions</h2>
+            <StatusBadge label={user.role} variant="NOMINAL" />
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-buram-border bg-buram-bg">
               {avatarPreviewUrl ? (
-                <img
-                  src={avatarPreviewUrl}
-                  alt="Selected profile picture preview"
-                  className="h-full w-full object-cover"
-                />
+                <img src={avatarPreviewUrl} alt="Preview" className="h-full w-full object-cover" />
               ) : user.avatarAttachmentId ? (
                 <img
-                  src={`${import.meta.env.VITE_API_BASE_URL || '/api/v1'}/auth/profile/avatar`}
-                  alt={`${user.name}'s profile picture`}
+                  src="/api/auth/profile/avatar"
+                  alt={user.name}
                   className="h-full w-full object-cover"
                 />
               ) : (
-                user.name
-                  .split(/\s+/)
-                  .map((part) => part[0])
-                  .join('')
-                  .slice(0, 2)
-                  .toUpperCase()
+                <div className="flex h-full w-full items-center justify-center font-mono text-xl font-bold text-buram-amber">
+                  {user.name.slice(0, 2).toUpperCase()}
+                </div>
               )}
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-buram-text">{user.name}</p>
-              <p className="truncate text-xs text-buram-muted">{user.email}</p>
-              <label className="mt-2 inline-flex min-h-10 max-w-full cursor-pointer items-center gap-2 rounded border border-buram-border bg-buram-elevated px-3 py-1.5 text-xs text-buram-pale hover:border-buram-amber">
+            <div>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded border border-buram-border bg-buram-bg px-3 py-1.5 text-xs text-buram-text hover:border-buram-amber">
                 <Camera className="h-3.5 w-3.5 text-buram-amber" />
                 Choose profile picture
                 <input
@@ -446,11 +705,11 @@ export const UserAndProfileWorkspace: React.FC<{
             </label>
             <div className="flex items-center gap-2 text-xs text-buram-muted">
               <ShieldCheck className="h-4 w-4 text-buram-success" />
-              Role and permissions are assigned by an administrator.
+              Role and permissions are assigned dynamically by the administrator.
             </div>
             <div>
               <span className={labelClass}>Authorized module permissions ({user.permissions.length})</span>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
                 {user.permissions.map((permission) => (
                   <span
                     key={permission}
@@ -499,14 +758,13 @@ export const UserAndProfileWorkspace: React.FC<{
               />
             </label>
             <label className="block">
-              <span className={labelClass}>New password (at least 10 characters)</span>
+              <span className={labelClass}>New password (min 10)</span>
               <input
                 className={inputClass}
                 type="password"
                 autoComplete="new-password"
-                minLength={10}
-                maxLength={128}
                 required
+                minLength={10}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
               />
@@ -517,16 +775,15 @@ export const UserAndProfileWorkspace: React.FC<{
                 className={inputClass}
                 type="password"
                 autoComplete="new-password"
-                minLength={10}
-                maxLength={128}
                 required
+                minLength={10}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
               />
             </label>
             <button
               disabled={isSaving}
-              className="min-h-11 w-full rounded border border-buram-amber px-4 py-2 text-sm text-buram-gold disabled:opacity-50 sm:w-auto"
+              className="min-h-11 w-full rounded bg-buram-amber px-4 py-2 text-sm font-semibold text-buram-ink disabled:opacity-50 sm:w-auto"
             >
               Update password
             </button>
@@ -534,9 +791,341 @@ export const UserAndProfileWorkspace: React.FC<{
         </section>
       </div>
 
+      {/* ========================================================================= */}
+      {/* ADMIN: DYNAMIC ROLES & AUTHORIZED MODULE PERMISSIONS MATRIX               */}
+      {/* ========================================================================= */}
       {isAdmin && (
-        <section className="min-w-0 space-y-5 rounded-lg border border-buram-amber/50 bg-buram-surface p-4 shadow-panel sm:p-5">
-          <div className="flex flex-wrap items-center gap-2">
+        <section className="min-w-0 space-y-4 rounded-lg border border-buram-amber/40 bg-buram-surface p-4 sm:p-5 shadow-panel">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-buram-border pb-3">
+            <div className="flex items-center gap-2.5">
+              <Shield className="h-5 w-5 text-buram-amber" />
+              <div>
+                <h2 className="font-mono text-sm uppercase tracking-wider text-buram-gold font-bold">
+                  Dynamic Roles & Module Permissions Matrix
+                </h2>
+                <p className="text-xs text-buram-muted mt-0.5">
+                  Server-authoritative RBAC: Customize authorized module permissions per role or create new dynamic roles.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={openCreateRoleModal}
+                className="inline-flex items-center gap-1.5 rounded bg-buram-amber px-3 py-1.5 text-xs font-semibold text-buram-ink hover:bg-buram-gold transition-colors shadow-sm"
+              >
+                <Plus className="h-3.5 w-3.5" /> Create Dynamic Role
+              </button>
+            </div>
+          </div>
+
+          {/* Roles Grid */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {roles.map((r) => {
+              const isExpanded = expandedRolePermissionsId === r._id;
+              const userCount = users.filter((u) => getRoleName(u.roleId).toLowerCase() === r.name.toLowerCase()).length;
+
+              return (
+                <div
+                  key={r._id || r.name}
+                  className="rounded-lg border border-buram-border bg-buram-bg p-3.5 flex flex-col justify-between space-y-3 hover:border-buram-amber/60 transition-colors"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold text-buram-text font-mono">{r.name}</h3>
+                          {r.isSystem ? (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-buram-elevated text-buram-muted border border-buram-border">
+                              SYSTEM
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-buram-amber/20 text-buram-gold border border-buram-amber/40">
+                              CUSTOM
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-buram-muted mt-1 line-clamp-2">
+                          {r.description || 'No description provided'}
+                        </p>
+                      </div>
+                      <StatusBadge
+                        label={r.isActive !== false ? 'ACTIVE' : 'INACTIVE'}
+                        variant={r.isActive !== false ? 'NOMINAL' : 'TECHNICAL'}
+                      />
+                    </div>
+
+                    <div className="pt-1">
+                      <div className="flex items-center justify-between text-xs font-mono text-buram-muted">
+                        <span>Assigned users:</span>
+                        <span className="text-buram-text font-bold">{userCount}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs font-mono text-buram-muted mt-1">
+                        <span>Module permissions:</span>
+                        <span className="text-buram-tech font-bold">
+                          {r.permissions.includes('*:*') ? 'All (*:*)' : `${r.permissions.length} granted`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Permissions preview */}
+                    {isExpanded && (
+                      <div className="pt-2 border-t border-buram-border space-y-1.5 animate-in fade-in duration-150">
+                        <span className={labelClass}>Authorized module permissions</span>
+                        <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                          {r.permissions.map((p) => (
+                            <span
+                              key={p}
+                              className="rounded border border-buram-border bg-buram-elevated px-1.5 py-0.5 text-[9px] font-mono text-buram-tech"
+                            >
+                              {p}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-buram-border/60 pt-2.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedRolePermissionsId(isExpanded ? null : r._id)
+                      }
+                      className="inline-flex items-center gap-1 text-[11px] font-mono text-buram-muted hover:text-buram-gold"
+                    >
+                      {isExpanded ? (
+                        <>
+                          <ChevronUp className="h-3 w-3" /> Hide perms
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-3 w-3" /> View perms ({r.permissions.length})
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openEditRoleModal(r)}
+                      className="inline-flex items-center gap-1 rounded border border-buram-border bg-buram-elevated px-2.5 py-1 text-xs font-mono font-bold text-buram-amber hover:border-buram-amber transition-colors"
+                    >
+                      <Edit3 className="h-3 w-3" /> Edit permissions
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ROLE PERMISSION EDIT / CREATE MODAL                                       */}
+      {/* ========================================================================= */}
+      {isRoleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in font-mono text-xs">
+          <div className="w-full max-w-4xl bg-buram-surface border border-buram-amber/60 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            {/* Modal Header */}
+            <div className="p-4 bg-buram-bg border-b border-buram-border flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded bg-buram-amber/20 border border-buram-amber/50 flex items-center justify-center text-buram-amber">
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-buram-gold font-sans">
+                    {isCreatingNewRole ? 'Create New Dynamic Role' : `Edit Authorized Permissions: ${roleForm.name}`}
+                  </h3>
+                  <p className="text-[11px] text-buram-muted">
+                    Toggle authorized module permissions. Changes apply across all assigned users dynamically.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRoleModalOpen(false)}
+                className="p-1.5 rounded text-buram-muted hover:text-buram-text hover:bg-buram-elevated"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4 overflow-y-auto space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className={labelClass}>Role Name *</span>
+                  <input
+                    className={inputClass}
+                    required
+                    disabled={!isCreatingNewRole && roles.find((r) => r._id === roleForm.id)?.isSystem}
+                    value={roleForm.name}
+                    onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })}
+                    placeholder="e.g. Senior Shift Supervisor"
+                  />
+                  {!isCreatingNewRole && roles.find((r) => r._id === roleForm.id)?.isSystem && (
+                    <span className="text-[10px] text-buram-muted mt-0.5 block">
+                      System role names are immutable, but their module permissions are fully dynamic.
+                    </span>
+                  )}
+                </label>
+                <label className="block">
+                  <span className={labelClass}>Role Description</span>
+                  <input
+                    className={inputClass}
+                    value={roleForm.description}
+                    onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })}
+                    placeholder="Operational responsibilities and scope"
+                  />
+                </label>
+              </div>
+
+              {/* Grouped Permission Matrix */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-buram-border pb-1.5">
+                  <span className="font-bold text-buram-amber uppercase tracking-wider text-[11px]">
+                    Authorized Module Permissions Matrix ({roleForm.permissions.length} selected)
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allKeys = SYSTEM_PERMISSION_CATALOG.flatMap((g) =>
+                          g.permissions.map((p) => p.key)
+                        );
+                        setRoleForm((prev) => ({ ...prev, permissions: allKeys }));
+                      }}
+                      className="text-[10px] font-mono text-buram-gold hover:underline"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-buram-muted">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setRoleForm((prev) => ({ ...prev, permissions: [] }))}
+                      className="text-[10px] font-mono text-buram-muted hover:text-buram-text"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {SYSTEM_PERMISSION_CATALOG.map((group) => {
+                    const groupKeys = group.permissions.map((p) => p.key);
+                    const selectedCount = groupKeys.filter((k) =>
+                      roleForm.permissions.includes(k)
+                    ).length;
+                    const allSelected = selectedCount === groupKeys.length;
+
+                    return (
+                      <div
+                        key={group.category}
+                        className="rounded-lg border border-buram-border bg-buram-bg p-3 space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between border-b border-buram-border/60 pb-1.5">
+                          <div>
+                            <span className="font-bold text-buram-text text-xs block font-sans">
+                              {group.moduleName}
+                            </span>
+                            <span className="text-[10px] text-buram-muted">
+                              {group.description}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleGroupPermissions(groupKeys)}
+                            className="text-[10px] font-mono text-buram-amber hover:underline shrink-0 ml-2"
+                          >
+                            {allSelected ? 'Clear' : 'All'} ({selectedCount}/{groupKeys.length})
+                          </button>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          {group.permissions.map((perm) => {
+                            const isChecked = roleForm.permissions.includes(perm.key);
+                            return (
+                              <label
+                                key={perm.key}
+                                className={`flex items-start gap-2 p-1.5 rounded cursor-pointer transition-colors ${
+                                  isChecked
+                                    ? 'bg-buram-amber/10 border border-buram-amber/30 text-buram-text'
+                                    : 'hover:bg-buram-elevated/60 text-buram-muted'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="sr-only"
+                                  checked={isChecked}
+                                  onChange={() => togglePermission(perm.key)}
+                                />
+                                <div className="mt-0.5 shrink-0">
+                                  {isChecked ? (
+                                    <CheckSquare className="w-3.5 h-3.5 text-buram-amber" />
+                                  ) : (
+                                    <Square className="w-3.5 h-3.5 text-buram-muted" />
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <span
+                                      className={`font-mono text-[11px] font-semibold ${
+                                        isChecked ? 'text-buram-gold' : 'text-buram-text'
+                                      }`}
+                                    >
+                                      {perm.key}
+                                    </span>
+                                    <span className="text-[10px] text-buram-muted truncate font-sans">
+                                      · {perm.label}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-buram-muted font-sans line-clamp-1">
+                                    {perm.description}
+                                  </p>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-3 bg-buram-bg border-t border-buram-border flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-buram-muted">
+                Mandatory GoBD reason will be requested upon confirmation.
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRoleModalOpen(false)}
+                  className="px-3 py-1.5 rounded border border-buram-border text-xs text-buram-muted hover:text-buram-text"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!roleForm.name.trim()}
+                  onClick={() => setIsRoleReasonDialogOpen(true)}
+                  className="px-4 py-1.5 rounded bg-buram-amber font-semibold text-buram-ink hover:bg-buram-gold transition-colors text-xs disabled:opacity-50"
+                >
+                  Save Role Permissions
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ADMIN: USER PROVISIONING & ACCOUNT MANAGEMENT                             */}
+      {/* ========================================================================= */}
+      {isAdmin && (
+        <section className="min-w-0 space-y-4 rounded-lg border border-buram-border bg-buram-surface p-4 sm:p-5">
+          <div className="flex items-center gap-2">
             <UserPlus className="h-4 w-4 text-buram-amber" />
             <h2 className="font-mono text-sm uppercase tracking-wider text-buram-gold">
               Admin user provisioning & account management
@@ -587,7 +1176,7 @@ export const UserAndProfileWorkspace: React.FC<{
               />
             </label>
             <label>
-              <span className={labelClass}>Role</span>
+              <span className={labelClass}>Role (Any Dynamic Role)</span>
               <select
                 className={inputClass}
                 required
@@ -599,16 +1188,17 @@ export const UserAndProfileWorkspace: React.FC<{
                 }}
               >
                 <option value="" disabled>
-                  Select a role
+                  Select a dynamic role
                 </option>
-                {ROLES.map((role) => (
-                  <option key={role} value={role}>
-                    {role}
+                {roles.map((role) => (
+                  <option key={role._id || role.name} value={role.name}>
+                    {role.name} {!role.isSystem ? '(Custom)' : ''} ({role.permissions.length} perms)
                   </option>
                 ))}
               </select>
             </label>
-            {newUser.roleName === 'Inspector' && (
+
+            {newUser.roleName.toLowerCase() === 'inspector' && (
               <label>
                 <span className={labelClass}>Inspector account expires</span>
                 <input
@@ -620,17 +1210,46 @@ export const UserAndProfileWorkspace: React.FC<{
                 />
               </label>
             )}
+
+            {/* Live preview of permissions granted by selected role */}
+            {selectedNewUserRole && (
+              <div className="sm:col-span-2 lg:col-span-3 rounded-lg border border-buram-border bg-buram-bg p-3 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className={labelClass}>
+                    Authorized module permissions for {selectedNewUserRole.name} ({selectedNewUserRole.permissions.length})
+                  </span>
+                  <span className="text-[10px] font-mono text-buram-muted">
+                    {selectedNewUserRole.description || 'Dynamic Role'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                  {selectedNewUserRole.permissions.map((p) => (
+                    <span
+                      key={p}
+                      className="rounded border border-buram-border bg-buram-elevated px-2 py-0.5 text-[10px] font-mono text-buram-tech"
+                    >
+                      {p}
+                    </span>
+                  ))}
+                  {selectedNewUserRole.permissions.length === 0 && (
+                    <span className="text-xs text-buram-muted">No module permissions assigned yet.</span>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="sm:col-span-2 lg:col-span-3">
               <button
                 type="submit"
                 disabled={isSaving || !newUser.roleName}
                 className="min-h-11 w-full rounded bg-buram-amber px-4 py-2 text-sm font-semibold text-buram-ink disabled:opacity-50 sm:w-auto"
               >
-                Create {newUser.roleName} account
+                Create {newUser.roleName || 'User'} account
               </button>
             </div>
           </form>
 
+          {/* EDIT EXISTING USER FORM */}
           {editingUser && (
             <form
               onSubmit={(event) => {
@@ -681,7 +1300,7 @@ export const UserAndProfileWorkspace: React.FC<{
                   />
                 </label>
                 <label>
-                  <span className={labelClass}>Assigned Role</span>
+                  <span className={labelClass}>Assigned Role (Any Dynamic Role)</span>
                   <select
                     className={inputClass}
                     value={editingUser.roleName}
@@ -689,9 +1308,9 @@ export const UserAndProfileWorkspace: React.FC<{
                       setEditingUser({ ...editingUser, roleName: e.target.value })
                     }
                   >
-                    {ROLES.map((role) => (
-                      <option key={role} value={role}>
-                        {role}
+                    {roles.map((role) => (
+                      <option key={role._id || role.name} value={role.name}>
+                        {role.name} {!role.isSystem ? '(Custom)' : ''} ({role.permissions.length} perms)
                       </option>
                     ))}
                   </select>
@@ -712,7 +1331,7 @@ export const UserAndProfileWorkspace: React.FC<{
                     <option value="INACTIVE">Deactivated (Revoke Sessions)</option>
                   </select>
                 </label>
-                <label className="sm:col-span-2 lg:col-span-2">
+                <label className="sm:col-span-2 lg:col-span-4">
                   <span className={labelClass}>
                     Reset Temporary Password (Optional, min 10 chars)
                   </span>
@@ -728,75 +1347,106 @@ export const UserAndProfileWorkspace: React.FC<{
                     }
                   />
                 </label>
-                <div className="flex items-end gap-2 sm:col-span-2 lg:col-span-2">
-                  <button
-                    type="submit"
-                    disabled={isSaving}
-                    className="min-h-10 rounded bg-buram-amber px-4 py-2 text-xs font-mono font-bold uppercase text-buram-ink hover:bg-buram-gold disabled:opacity-50"
-                  >
-                    Save Account Changes
-                  </button>
-                </div>
+
+                {/* Live preview of permissions for editing user */}
+                {selectedEditingUserRole && (
+                  <div className="sm:col-span-2 lg:col-span-4 rounded-lg border border-buram-border bg-buram-surface p-3 space-y-1.5">
+                    <span className={labelClass}>
+                      Authorized module permissions for {selectedEditingUserRole.name} ({selectedEditingUserRole.permissions.length})
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                      {selectedEditingUserRole.permissions.map((p) => (
+                        <span
+                          key={p}
+                          className="rounded border border-buram-border bg-buram-bg px-2 py-0.5 text-[10px] font-mono text-buram-tech"
+                        >
+                          {p}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="min-h-10 rounded bg-buram-amber px-4 py-1.5 text-xs font-semibold text-buram-ink disabled:opacity-50"
+                >
+                  Save account changes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="min-h-10 rounded border border-buram-border px-3 py-1.5 text-xs text-buram-muted hover:text-buram-text"
+                >
+                  Cancel
+                </button>
               </div>
             </form>
           )}
 
+          {/* User directory table */}
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[680px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-buram-border text-xs uppercase text-buram-muted">
-                  <th className="p-2">Name</th>
-                  <th className="p-2">Email</th>
-                  <th className="p-2">Role</th>
-                  <th className="p-2">Account & Password Policy</th>
-                  <th className="p-2 text-right">Actions</th>
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="border-b border-buram-border text-buram-muted">
+                <tr>
+                  <th className="p-3">User</th>
+                  <th className="p-3">Role</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3">Created</th>
+                  <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-buram-border/40 text-buram-text">
                 {users.map((entry) => (
-                  <tr key={entry._id} className="border-b border-buram-border/60">
-                    <td className="p-2 text-buram-text">{entry.fullName}</td>
-                    <td className="p-2 text-buram-muted">{entry.email}</td>
-                    <td className="p-2">
+                  <tr key={entry._id} className="hover:bg-buram-bg/50">
+                    <td className="p-3">
+                      <div className="font-semibold">{entry.fullName}</div>
+                      <div className="text-[11px] text-buram-muted">{entry.email}</div>
+                    </td>
+                    <td className="p-3">
                       <StatusBadge
                         label={getRoleName(entry.roleId)}
                         variant={getRoleName(entry.roleId) === 'Admin' ? 'AMBER' : 'TECHNICAL'}
                       />
                     </td>
-                    <td className="p-2">
-                      <StatusBadge
-                        label={
+                    <td className="p-3">
+                      <span
+                        className={`inline-flex rounded px-2 py-0.5 text-[10px] font-bold ${
                           !entry.isActive
-                            ? 'DEACTIVATED'
+                            ? 'bg-buram-critical/20 text-buram-critical'
                             : entry.mustChangePassword
-                              ? 'TEMP PASSWORD'
-                              : 'ACTIVE'
-                        }
-                        variant={
-                          !entry.isActive
-                            ? 'CRITICAL'
-                            : entry.mustChangePassword
-                              ? 'WARNING'
-                              : 'NOMINAL'
-                        }
-                      />
+                              ? 'bg-buram-warning/20 text-buram-warning'
+                              : 'bg-buram-success/20 text-buram-success'
+                        }`}
+                      >
+                        {!entry.isActive
+                          ? 'DEACTIVATED'
+                          : entry.mustChangePassword
+                            ? 'TEMP PWD'
+                            : 'ACTIVE'}
+                      </span>
                     </td>
-                    <td className="p-2 text-right">
-                      <div className="inline-flex items-center gap-1.5">
+                    <td className="p-3 text-buram-muted">
+                      {new Date(entry.createdAt).toLocaleDateString('de-DE')}
+                    </td>
+                    <td className="p-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
                           onClick={() => startEditingUser(entry)}
-                          className="inline-flex items-center gap-1 rounded border border-buram-border bg-buram-elevated px-2.5 py-1 text-xs font-mono text-buram-pale hover:border-buram-amber"
+                          className="inline-flex items-center gap-1 rounded border border-buram-border bg-buram-elevated px-2 py-1 text-xs text-buram-pale hover:border-buram-amber hover:text-buram-gold transition-colors"
                         >
-                          <Edit3 className="h-3 w-3" /> Manage
+                          <Edit3 className="h-3 w-3" /> Edit
                         </button>
                         <button
                           type="button"
                           onClick={() => startEditingUser(entry, !entry.isActive)}
-                          className={`rounded border px-2.5 py-1 text-xs font-mono ${
+                          className={`rounded border px-2 py-1 text-xs transition-colors ${
                             entry.isActive
-                              ? 'border-buram-critical/50 bg-buram-critical/10 text-buram-critical hover:bg-buram-critical/20'
-                              : 'border-buram-success/50 bg-buram-success/10 text-buram-success hover:bg-buram-success/20'
+                              ? 'border-buram-border text-buram-muted hover:border-buram-critical hover:text-buram-critical'
+                              : 'border-buram-amber text-buram-amber hover:bg-buram-amber/10'
                           }`}
                         >
                           {entry.isActive ? 'Deactivate' : 'Activate'}

@@ -1,4 +1,4 @@
-﻿// client/src/components/layout/AppShell.tsx
+// client/src/components/layout/AppShell.tsx
 import React, { useEffect, useState } from 'react';
 import {
   Activity,
@@ -41,6 +41,15 @@ import {
 
 export type { ModuleKey } from '../../lib/moduleAccess';
 
+export interface NavTelemetryBadges {
+  pendingQaLotsCount?: number;
+  occupiedCabinetSlotsCount?: number;
+  totalCabinetSlotsCount?: number;
+  activeBatchesCount?: number;
+  activeProcessesCount?: number;
+  activeShipmentsCount?: number;
+}
+
 interface NavItem {
   key: ModuleKey;
   label: string;
@@ -73,6 +82,7 @@ export const AppShell: React.FC<{
   nextcloudOnline: boolean;
   lastSyncIso: string | null;
   unreadNotificationsCount: number;
+  navBadges?: NavTelemetryBadges;
   notifications?: NotificationItem[];
   onAcknowledgeNotification?: (id: string) => void;
   onLogout: () => void;
@@ -86,6 +96,7 @@ export const AppShell: React.FC<{
   nextcloudOnline,
   lastSyncIso,
   unreadNotificationsCount,
+  navBadges,
   notifications = [],
   onAcknowledgeNotification,
   onLogout,
@@ -158,6 +169,73 @@ export const AppShell: React.FC<{
     const Icon = item.icon;
     const isActive = activeModule === item.key;
 
+    // Dynamic telemetry & health badges
+    let badgeContent: React.ReactNode = null;
+    if (item.key === 'AUDIT_DOCS') {
+      badgeContent = (
+        <span
+          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono ${
+            nextcloudOnline
+              ? 'bg-buram-success/15 text-buram-success border border-buram-success/30'
+              : 'bg-buram-amber/15 text-buram-amber border border-buram-amber/30'
+          }`}
+          title={nextcloudOnline ? 'Nextcloud WebDAV: Connected' : 'Nextcloud WebDAV: Degraded'}
+        >
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              nextcloudOnline ? 'bg-buram-success' : 'bg-buram-amber animate-pulse'
+            }`}
+          />
+          {!collapsed && <span>{nextcloudOnline ? 'LIVE' : 'SYNC'}</span>}
+        </span>
+      );
+    } else if (item.key === 'INCOMING_QA' && (navBadges?.pendingQaLotsCount ?? 0) > 0) {
+      badgeContent = (
+        <span
+          className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-buram-amber/20 text-buram-gold border border-buram-amber/30"
+          title={`${navBadges?.pendingQaLotsCount} lot(s) under review or quality hold`}
+        >
+          {navBadges?.pendingQaLotsCount}
+        </span>
+      );
+    } else if (item.key === 'WARM_CABINETS' && (navBadges?.occupiedCabinetSlotsCount ?? 0) > 0) {
+      badgeContent = (
+        <span
+          className="px-1.5 py-0.2 rounded text-[10px] font-mono text-buram-tech bg-buram-tech/15 border border-buram-tech/30"
+          title={`${navBadges?.occupiedCabinetSlotsCount} of ${navBadges?.totalCabinetSlotsCount || 34} warm cabinet slots occupied`}
+        >
+          {navBadges?.occupiedCabinetSlotsCount}/{navBadges?.totalCabinetSlotsCount || 34}
+        </span>
+      );
+    } else if (item.key === 'BATCH_PLANNING' && (navBadges?.activeBatchesCount ?? 0) > 0) {
+      badgeContent = (
+        <span
+          className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-buram-elevated text-buram-text border border-buram-border"
+          title={`${navBadges?.activeBatchesCount} batch plan(s) active`}
+        >
+          {navBadges?.activeBatchesCount}
+        </span>
+      );
+    } else if (item.key === 'PROCESSING' && (navBadges?.activeProcessesCount ?? 0) > 0) {
+      badgeContent = (
+        <span
+          className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-buram-tech/20 text-buram-tech border border-buram-tech/40 animate-pulse"
+          title={`${navBadges?.activeProcessesCount} active production process(es)`}
+        >
+          {navBadges?.activeProcessesCount}
+        </span>
+      );
+    } else if (item.key === 'SHIPMENTS' && (navBadges?.activeShipmentsCount ?? 0) > 0) {
+      badgeContent = (
+        <span
+          className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-buram-elevated text-buram-gold border border-buram-border"
+          title={`${navBadges?.activeShipmentsCount} active customer shipment lot(s)`}
+        >
+          {navBadges?.activeShipmentsCount}
+        </span>
+      );
+    }
+
     return (
       <button
         key={item.key}
@@ -179,13 +257,28 @@ export const AppShell: React.FC<{
         aria-current={isActive ? 'page' : undefined}
       >
         <div className="flex items-center gap-3 min-w-0">
-          <Icon
-            className={`w-4 h-4 shrink-0 ${
-              isActive ? 'text-buram-amber' : 'text-buram-muted'
-            }`}
-          />
+          <div className="relative shrink-0">
+            <Icon
+              className={`w-4 h-4 ${
+                isActive ? 'text-buram-amber' : 'text-buram-muted'
+              }`}
+            />
+            {item.key === 'AUDIT_DOCS' && collapsed && (
+              <span
+                className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-buram-surface ${
+                  nextcloudOnline ? 'bg-buram-success' : 'bg-buram-amber animate-pulse'
+                }`}
+                title={nextcloudOnline ? 'Nextcloud: OK' : 'Nextcloud: Degraded'}
+              />
+            )}
+          </div>
           {!collapsed && <span className="truncate">{item.label}</span>}
         </div>
+        {!collapsed && badgeContent && (
+          <div className="shrink-0 ml-2">
+            {badgeContent}
+          </div>
+        )}
       </button>
     );
   };

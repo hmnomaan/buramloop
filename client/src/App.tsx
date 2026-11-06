@@ -1,4 +1,4 @@
-﻿// client/src/App.tsx
+// client/src/App.tsx
 import { WarehouseStockLedgerWorkspace } from './pages/WarehouseStockLedgerWorkspace';
 import React, { useEffect, useState, useCallback } from 'react';
 import { AppShell, ModuleKey } from './components/layout/AppShell';
@@ -759,6 +759,22 @@ export const App: React.FC = () => {
       nextcloudOnline={nextcloudOnline}
       lastSyncIso={lastSyncIso}
       unreadNotificationsCount={notifications.filter((n) => !n.acknowledged).length}
+      navBadges={{
+        pendingQaLotsCount: lots.filter(
+          (l) => l.qualityStatus === 'UNDER_REVIEW' || l.qualityStatus === 'QUALITY_HOLD'
+        ).length,
+        occupiedCabinetSlotsCount: cabinetSlots.filter((s) => s.state !== 'EMPTY').length,
+        totalCabinetSlotsCount: cabinetSlots.length || 34,
+        activeBatchesCount: batches.filter(
+          (b) => b.status !== 'COMPLETED' && b.status !== 'VOIDED'
+        ).length,
+        activeProcessesCount: activeProcesses.filter(
+          (process) => process.currentSevenStage !== 'COMPLETED'
+        ).length,
+        activeShipmentsCount: shipmentLots.filter(
+          (lot) => lot.status !== 'SHIPPED'
+        ).length,
+      }}
       onLogout={handleLogout}
       onOpenMobileScanner={() => {
         if (canReceiveIncomingLots(user)) setIsScannerOpen(true);

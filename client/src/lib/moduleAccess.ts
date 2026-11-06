@@ -69,8 +69,8 @@ const MODULE_ACCESS: Record<ModuleKey, ModuleAccessRule> = {
     anyPermissions: ['trace:read'],
   },
   AUDIT_DOCS: {
-    allowedRoles: ALL_ROLES,
-    anyPermissions: ['audit:read', 'exports:run', 'attachments:read'],
+    allowedRoles: ['ADMIN', 'MANAGEMENT'],
+    anyPermissions: ['audit:read', 'exports:run', 'attachments:read', 'admin:compliance'],
   },
   USER_PROFILE: { allowedRoles: ALL_ROLES },
 };
@@ -83,14 +83,27 @@ export function hasPermission(permissions: readonly string[], required: string):
 
 export function canAccessModule(user: UserSession, module: ModuleKey): boolean {
   if (user.mustChangePassword) return module === 'USER_PROFILE';
+  if (user.role === 'ADMIN' || user.permissions?.includes('*:*')) return true;
 
   const rule = MODULE_ACCESS[module];
-  if (!rule.allowedRoles.includes(user.role)) return false;
-  if (!rule.anyPermissions?.length) return true;
+  if (!rule) return false;
 
-  return rule.anyPermissions.some((permission) =>
-    hasPermission(user.permissions, permission)
-  );
+  // Role matches default allowed list
+  if (rule.allowedRoles.includes(user.role)) {
+    if (!rule.anyPermissions?.length) return true;
+    return rule.anyPermissions.some((permission) =>
+      hasPermission(user.permissions, permission)
+    );
+  }
+
+  // Admin delegation: User role is not in default list, but user has been explicitly granted module permission
+  if (rule.anyPermissions?.length) {
+    return rule.anyPermissions.some((permission) =>
+      hasPermission(user.permissions, permission)
+    );
+  }
+
+  return false;
 }
 
 export function canReceiveIncomingLots(user: UserSession): boolean {

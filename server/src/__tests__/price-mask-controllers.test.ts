@@ -1,8 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
+import { Types } from 'mongoose';
 import { BatchController } from '../modules/batch/batch.controller';
 import { BatchService } from '../modules/batch/batch.service';
 import { ProcessController } from '../modules/process/process.controller';
 import { ProcessService } from '../modules/process/process.service';
+import { TraceController } from '../modules/trace/trace.controller';
+import { TraceService } from '../modules/trace/trace.service';
 import { BatchModel, ReworkStockModel } from '../models';
 
 function requestWithRole(roleName: string): Request {
@@ -237,5 +240,85 @@ describe('R9 controller price-field serialization', () => {
     expect(batchSpy).toHaveBeenCalledTimes(1);
     expect(processSpy).toHaveBeenCalledTimes(1);
     expect(executeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  describe('BL-058: TraceController lookup RBAC & masking enforcement', () => {
+    it('forces Inspector role for lookup when caller lacks trace:admin_route and is not Admin', async () => {
+      const traceSpy = jest
+        .spyOn(TraceService, 'traceByReference')
+        .mockResolvedValue({ queriedCode: 'B-2026-089', inspectorMode: true } as any);
+
+      const inspectorReq = {
+        user: {
+          userId: new Types.ObjectId('671f00000000000000000001'),
+          roleName: 'INSPECTOR',
+          permissions: ['trace:inspect'],
+          isAdmin: false,
+          isInspector: true,
+        },
+        params: { code: 'B-2026-089' },
+        query: {},
+        body: {},
+        headers: {},
+      } as unknown as Request;
+
+      const inspectorRes = responseCapture();
+      await TraceController.lookup(inspectorReq, inspectorRes.res, jest.fn() as NextFunction);
+
+      expect(traceSpy).toHaveBeenCalledWith('B-2026-089', 'Inspector');
+      expect(inspectorRes.json.mock.calls[0][0].data.inspectorMode).toBe(true);
+    });
+
+    it('passes actor role when caller is Admin', async () => {
+      const traceSpy = jest
+        .spyOn(TraceService, 'traceByReference')
+        .mockResolvedValue({ queriedCode: 'B-2026-089', inspectorMode: false } as any);
+
+      const adminReq = {
+        user: {
+          userId: new Types.ObjectId('671f00000000000000000002'),
+          roleName: 'ADMIN',
+          permissions: ['*:*'],
+          isAdmin: true,
+          isInspector: false,
+        },
+        params: { code: 'B-2026-089' },
+        query: {},
+        body: {},
+        headers: {},
+      } as unknown as Request;
+
+      const adminRes = responseCapture();
+      await TraceController.lookup(adminReq, adminRes.res, jest.fn() as NextFunction);
+
+      expect(traceSpy).toHaveBeenCalledWith('B-2026-089', 'ADMIN');
+      expect(adminRes.json.mock.calls[0][0].data.inspectorMode).toBe(false);
+    });
+
+    it('allows non-Admin user with explicitly granted trace:admin_route to view admin route', async () => {
+      const traceSpy = jest
+        .spyOn(TraceService, 'traceByReference')
+        .mockResolvedValue({ queriedCode: 'B-2026-089', inspectorMode: false } as any);
+
+      const privilegedReq = {
+        user: {
+          userId: new Types.ObjectId('671f00000000000000000003'),
+          roleName: 'QA_LEAD',
+          permissions: ['qa:inspect', 'trace:admin_route'],
+          isAdmin: false,
+          isInspector: false,
+        },
+        params: { code: 'B-2026-089' },
+        query: {},
+        body: {},
+        headers: {},
+      } as unknown as Request;
+
+      const privilegedRes = responseCapture();
+      await TraceController.lookup(privilegedReq, privilegedRes.res, jest.fn() as NextFunction);
+
+      expect(traceSpy).toHaveBeenCalledWith('B-2026-089', 'QA_LEAD');
+      expect(privilegedRes.json.mock.calls[0][0].data.inspectorMode).toBe(false);
+    });
   });
 });

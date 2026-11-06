@@ -13,10 +13,11 @@ export const SYSTEM_ROLES = [
 export type SystemRole = (typeof SYSTEM_ROLES)[number];
 
 export const UpsertRoleSchema = z.object({
-  name: z.enum(SYSTEM_ROLES),
-  description: z.string().trim().min(3).max(200),
-  permissions: z.array(z.string().trim().min(3)).min(1),
-  isSystem: z.boolean().default(true),
+  name: z.string().trim().min(2).max(60),
+  description: z.string().trim().max(300).default(''),
+  permissions: z.array(z.string().trim().min(1)).default([]),
+  isSystem: z.boolean().default(false),
+  isActive: z.boolean().optional(),
   reason: ReasonSchema.optional(),
 });
 
@@ -25,13 +26,13 @@ export const CreateUserSchema = z
     name: z.string().trim().min(2).max(120),
     email: z.string().trim().toLowerCase().email(),
     password: z.string().min(10).max(128),
-    roleName: z.enum(SYSTEM_ROLES),
+    roleName: z.string().trim().min(2).max(60),
     roleId: ObjectIdSchema.optional(),
     expiresAt: z.coerce.date().optional().nullable(),
     reason: ReasonSchema,
   })
   .superRefine((data, ctx) => {
-    if (data.roleName === 'Inspector' && !data.expiresAt) {
+    if (data.roleName.trim().toLowerCase() === 'inspector' && !data.expiresAt) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['expiresAt'],

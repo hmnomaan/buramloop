@@ -49,6 +49,12 @@ Recent major milestones delivered and verified:
   Role-targeted push alerts with Web Audio synthesized chimes, bottom 2s auto-fading toasts, notification bell hover preview + click-to-pin open, and PWA Service Worker push routing (`sw.js`, `manifest.json`).
 - **Dynamic Data Binding & Resilient Envelope Unwrapping:**
   Guaranteed dynamic data delivery across all endpoints with dual-envelope parsing for `{ ok, data }` and raw arrays.
+- **Dual Traceability Route Model & Admin Route RBAC Gate (`BL-057`, `BL-058`):**
+  5-step sequence stepper (1: Lots, 2: Drums, 3: Batch, 4: Route/Stations, 5: Certificate Preview), Operational Station Telemetry Strip (Dock WE -> CAB-01/02 -> FLT-01 -> MIX-01 -> Packaging -> OUT Dock), and deep Operational Route Step Inspector Modal for Staff/Admin. Government Inspectors and unauthorized roles are strictly locked to masked regulatory route via backend enforcement in `TraceController.lookup`.
+- **Dynamic Dashboard Sidebar & Live Telemetry Badges (`BL-059`):**
+  Role-gated sidebar navigation restricting `Audit, Nextcloud & Exports` to authorized roles with live Nextcloud WebDAV status chip (`LIVE` / `SYNC`), and real-time operational badges (pending QA lots, warm cabinet occupancy, active batches, active processes, and active shipments).
+- **Dynamic Roles & Authorized Module Permissions Matrix (`BL-060`):**
+  Dynamic role customization panel in `UserAndProfileWorkspace.tsx` mapping 25 system permissions across 6 module categories. Enables Admin to create custom dynamic roles, adjust permissions on existing roles with GoBD reasons, and provision users with any role featuring real-time permission preview chips.
 
 Important unfinished scope:
 
