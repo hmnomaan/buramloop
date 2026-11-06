@@ -11,6 +11,7 @@ import {
   FlaskConical,
   CheckCircle2,
   FileSpreadsheet,
+  FileText,
 } from 'lucide-react';
 import { UserSession } from '../types/erp';
 import {
@@ -437,8 +438,8 @@ export const TraceabilityAuditWorkspace: React.FC<{
 
   return (
     <div className="space-y-5">
-      {/* 1. HEADER & CONTROLS (BILINGUAL / 4-LANG + STAFF/INSPECTOR VIEW + VIEW MODE) */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-buram-border">
+      {/* 1. HEADER & GLOBAL CONTROLS (TITLE + PERSPECTIVE + BILINGUAL / 4-LANG) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-buram-border">
         <div>
           <span className="text-[11px] font-mono font-bold text-buram-amber uppercase tracking-widest block">
             {t.assuranceTag}
@@ -449,7 +450,7 @@ export const TraceabilityAuditWorkspace: React.FC<{
           <p className="text-xs text-buram-muted mt-1">{t.pageSubtitle}</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           {/* Dual-Perspective Switcher: Staff view | Inspector view (Masked) */}
           <div className="inline-flex rounded-lg bg-buram-surface p-1 border border-buram-border font-mono text-xs">
             <button
@@ -476,49 +477,9 @@ export const TraceabilityAuditWorkspace: React.FC<{
             </button>
           </div>
 
-          {/* Dual-View Toggle (Chain Explorer vs Origin Certificate Preview) */}
-          {traceData && (
-            <div className="inline-flex rounded-lg bg-buram-surface p-1 border border-buram-border font-mono text-xs">
-              <button
-                type="button"
-                onClick={() => setViewMode('CHAIN_EXPLORER')}
-                className={`px-3 py-1.5 rounded transition-colors ${
-                  viewMode === 'CHAIN_EXPLORER'
-                    ? 'bg-buram-amber text-buram-bg font-bold shadow-sm'
-                    : 'text-buram-muted hover:text-buram-text'
-                }`}
-              >
-                {t.viewChainBtn}
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('ORIGIN_CERTIFICATE')}
-                className={`px-3 py-1.5 rounded transition-colors ${
-                  viewMode === 'ORIGIN_CERTIFICATE'
-                    ? 'bg-buram-amber text-buram-bg font-bold shadow-sm'
-                    : 'text-buram-muted hover:text-buram-text'
-                }`}
-              >
-                {t.viewCertBtn}
-              </button>
-            </div>
-          )}
-
-          {/* Instant IFS Food v8 Regulatory Hold Trigger */}
-          {traceData && canExecuteRegulatoryHold && (
-            <button
-              type="button"
-              onClick={() => setIsHoldDialogOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-buram-critical text-white font-mono text-xs font-bold uppercase hover:opacity-90 shadow-panel transition-all"
-            >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              <span>{t.holdActionBtn}</span>
-            </button>
-          )}
-
           {/* 4-Language Switcher (DE | TR | EN | BN) */}
           <div className="inline-flex rounded-lg bg-buram-elevated border border-buram-border p-1 font-mono text-xs">
-            <div className="flex items-center px-2 text-buram-amber">
+            <div className="flex items-center px-1.5 text-buram-amber">
               <Globe className="w-3.5 h-3.5" />
             </div>
             {(['DE', 'EN', 'TR', 'BN'] as const).map((code) => (
@@ -526,7 +487,7 @@ export const TraceabilityAuditWorkspace: React.FC<{
                 key={code}
                 type="button"
                 onClick={() => setLang(code)}
-                className={`px-2.5 py-1 rounded transition-colors ${
+                className={`px-2 py-1 rounded transition-colors ${
                   lang === code
                     ? 'bg-buram-amber text-buram-bg font-bold shadow-sm'
                     : 'text-buram-muted hover:text-buram-text'
@@ -539,6 +500,62 @@ export const TraceabilityAuditWorkspace: React.FC<{
           </div>
         </div>
       </div>
+
+      {/* ACTIVE TRACE ACTION TOOLBAR (RENDERED WHEN TRACEDATA IS ACTIVE) */}
+      {!isLoading && traceData && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-buram-surface border border-buram-border shadow-panel">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 pr-3 border-r border-buram-border">
+              <span className="w-2.5 h-2.5 rounded-full bg-buram-success animate-pulse" />
+              <div className="font-mono text-xs">
+                <span className="text-[10px] text-buram-muted uppercase block leading-none">AKTIVE CHARGE / RECORD</span>
+                <span className="font-bold text-buram-gold text-sm">{traceData.queriedCode}</span>
+              </div>
+            </div>
+
+            {/* Dual-View Switcher: 6-Column Explorer vs Origin Certificate */}
+            <div className="inline-flex rounded-lg bg-buram-bg p-1 border border-buram-border font-mono text-xs">
+              <button
+                type="button"
+                onClick={() => setViewMode('CHAIN_EXPLORER')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${
+                  viewMode === 'CHAIN_EXPLORER'
+                    ? 'bg-buram-amber text-buram-bg font-bold shadow-sm'
+                    : 'text-buram-muted hover:text-buram-text'
+                }`}
+              >
+                <GitMerge className="w-3.5 h-3.5" />
+                <span>{t.viewChainBtn}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('ORIGIN_CERTIFICATE')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded transition-colors ${
+                  viewMode === 'ORIGIN_CERTIFICATE'
+                    ? 'bg-buram-amber text-buram-bg font-bold shadow-sm'
+                    : 'text-buram-muted hover:text-buram-text'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>{t.viewCertBtn}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Instant IFS Food v8 Regulatory Hold Action */}
+          {canExecuteRegulatoryHold && (
+            <button
+              type="button"
+              onClick={() => setIsHoldDialogOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-buram-critical text-white font-mono text-xs font-bold uppercase hover:opacity-90 shadow-panel transition-all shrink-0"
+              title="IFS Food v8 Clause 4.18.2 Instant Regulatory Quarantine"
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>{t.holdActionBtn}</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {errorMessage && (
         <div className="p-3.5 rounded bg-buram-critical/15 border border-buram-critical/50 flex items-center gap-2 text-xs font-mono text-buram-critical">

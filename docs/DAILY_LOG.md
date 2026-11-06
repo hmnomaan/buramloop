@@ -564,6 +564,14 @@ check.
 - **Validation:** `tsc --noEmit` on `client` and `server` passed (0 errors); client production build passed (`dist/index.html` + chunks); server unit tests passed (`german-standard-trace-hold.test.ts`); executed full `e2e-traceability-workflow.test.ts` (BL-039) against a live `MongoMemoryReplSet` verifying dynamic end-to-end receipt, QA review, batch planning, 7-stage processing, shipment, and snapshot-isolated trace lookups; updated `apiClient` response unwrapping across `AdminAuditAndComplianceWorkspace.tsx` and `TraceabilityAuditWorkspace.tsx` ensuring 100% dynamic data binding.
 - **Open/blockers:** Live container deployment and browser acceptance testing remain open.
 
+- **Completed:** Restructured Traceability Explorer header hierarchy (`ctx-v72`, `BL-056`):
+  - Solved button overflow and right-edge truncation reported in user screenshots (`media_1793963666975_f5f1767a.png` & `media_1793963669503_898c2bcf.png`) by separating global page settings from contextual record actions.
+  - Kept perspective toggle (`Staff view | Inspector view`) and 4-language switcher (`DE | EN | TR | BN`) in the top header.
+  - Mounted a dedicated Active Trace Action Toolbar rendered when a trace record is loaded with active code badge, 6-Column Explorer / Origin Certificate switcher, and IFS Food v8 instant regulatory hold button.
+- **Issues/fixes:** [BL-056](./ISSUES_AND_FIXES.md#resolved).
+- **Validation:** `tsc -b && vite build` passed in 9.10s (0 errors); visual truncation and clipping eliminated.
+- **Open/blockers:** Live container deployment and browser acceptance testing remain open.
+
 ## Daily entry template
 
 ## YYYY-MM-DD

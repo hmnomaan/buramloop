@@ -826,6 +826,15 @@ and [roadmap](./ROADMAP.md) for active status.*
   - Populates `actorId` with `fullName`, `email`, and `roleName`.
 - Validation passed: `tsc --noEmit` on `client` and `server` (0 errors); client production build passed; unit tests passed.
 
+## ctx-v72 — Traceability Header Control Ergonomics & Active Trace Action Toolbar (`BL-056`) (2026-11-06)
+
+- Resolved header horizontal overflow and button clipping in `client/src/pages/TraceabilityAuditWorkspace.tsx` (`BL-056`):
+  - **Issue:** All 4 header control elements (`Staff/Inspector view`, `6-Column/Origin Certificate switcher`, `IFS Hold action button`, and `4-Language selector`) were horizontally crammed into a single row alongside the title and subtitle, causing button truncation and right-edge clipping on standard viewports (Images `media_1793963666975_f5f1767a.png` & `media_1793963669503_898c2bcf.png`).
+  - **Architecture & Layout Restructuring:**
+    - **Top Header Bar:** Streamlined to contain only global page settings: the title/subtitle, the perspective switcher (`Staff view | Inspector view (Masked)`), and the 4-language switcher (`DE | EN | TR | BN`).
+    - **Active Trace Action Toolbar:** Created a dedicated contextual toolbar rendered directly above results when a trace record is active (`!isLoading && traceData`). Houses the active record identifier chip, the dual-view mode switcher (`6-Column Chain Explorer` vs. `Origin Certificate Preview`), and the IFS Food v8 instant regulatory hold button (`🚨 Charge sofort sperren (IFS Hold)`).
+- Validation passed: Client production build `tsc -b && vite build` passed (0 errors, 9.10s); visual overflow and clipping completely eliminated.
+
 ## RULES  for  BURAMLOOP AI DEVELOPMENT
 
 1. Inspect existing code before proposing changes.
