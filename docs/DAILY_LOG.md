@@ -549,6 +549,19 @@ check.
 - **Validation:** `tsc --noEmit` on `shared`, `server`, and `client` passed (0 errors); client `vite build` passed in 11.97s; all 15 server Jest suites (57 tests, including `MongoMemoryReplSet` E2E workflows) passed.
 - **Open/blockers:** Live container deployment and browser acceptance testing remain open.
 
+- **Completed:** Decoupled and delivered the enterprise Admin Audit & Compliance Workspace (`ctx-v71`, `BL-055`, `R16`):
+  - Decoupled module routing in `client/src/App.tsx`: `TRACEABILITY` routes exclusively to the product provenance explorer (`TraceabilityAuditWorkspace.tsx`), while `AUDIT_DOCS` routes to the universal cross-module governance center (`AdminAuditAndComplianceWorkspace.tsx`).
+  - Built `client/src/pages/AdminAuditAndComplianceWorkspace.tsx` combining features from both attached user compliance and audit designs:
+    - 4-tab navigation with live counts: `Audit trail`, `Stock ledger`, `Export history`, `Documents`.
+    - Advanced filter panel: Search (Action/Reference/Doc), Actor (Name/Email), Module dropdown, Severity dropdown (`ALL`, `INFO`, `WARNING`, `CRITICAL`), and `FROM` / `TO` date bounds.
+    - Side-by-side Before/After JSON diff inspection modal with one-click JSON clipboard copy.
+    - Direct filtered CSV export with standard column mappings.
+    - Live Nextcloud WebDAV storage connection health indicator.
+  - Upgraded backend query handling in `server/src/modules/audit/audit.routes.ts`: actor regex lookup via `UserModel`, date bounds, full-text `$or` search on reasons/references/actions/modules, and actor population.
+- **Issues/fixes:** [BL-055](./ISSUES_AND_FIXES.md#resolved).
+- **Validation:** `tsc --noEmit` on `client` and `server` passed (0 errors); client production build passed (`dist/index.html` + chunks); server unit tests passed (`german-standard-trace-hold.test.ts`).
+- **Open/blockers:** Live container deployment and browser acceptance testing remain open.
+
 ## Daily entry template
 
 ## YYYY-MM-DD

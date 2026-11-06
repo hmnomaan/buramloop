@@ -803,6 +803,27 @@ and [roadmap](./ROADMAP.md) for active status.*
 - Added comprehensive unit test `server/src/__tests__/german-standard-trace-hold.test.ts` verifying DIN 1333 formatting, date formatting, and 4-language dictionary completeness.
 - Validation passed: `tsc --noEmit` on `shared`, `server`, and `client` (0 errors); client production build passed; all 15 server Jest test suites (57 tests, including `MongoMemoryReplSet` E2E workflows) passed.
 
+## ctx-v71 — Enterprise Admin Audit & Compliance Workspace Decoupled from Trace (`BL-055`, `R16`) (2026-11-06)
+
+- Completely decoupled System Governance & Compliance Audit from Product Traceability in `client/src/App.tsx`:
+  - `activeModule === 'TRACEABILITY'` exclusively serves the product graph and regulatory food inspection view (`TraceabilityAuditWorkspace.tsx`).
+  - `activeModule === 'AUDIT_DOCS'` renders the enterprise cross-module system governance center (`AdminAuditAndComplianceWorkspace.tsx`).
+- Created `client/src/pages/AdminAuditAndComplianceWorkspace.tsx` combining all design requirements from the compliance audit specifications and attached user UI references:
+  - **4-Tab Governance Architecture:**
+    1. **Audit trail:** System-wide immutable compliance log covering `AUTH`, `SOURCING`, `STOCK`, `WARM_ROOM`, `BATCH`, `PROCESS`, `SHIPMENT`, `MASTER`, `TRACE`, `STORAGE`, `EXPORTS`. Columns: `When`, `Event Type`, `Action`, `Entity`, `Reference`, `Severity` (`INFO` / `WARNING` / `CRITICAL`), `Source IP`, `Actor`, `Role`, `Reason`, and `Details`.
+    2. **Stock ledger:** Append-only physical and status movements ledger (GoBD / EU 178/2002) with signed weight delta ($\Delta$), flow locations, and reasons.
+    3. **Export history:** Audited dataset dumps, formats, row counts, and Nextcloud archive file paths.
+    4. **Documents:** Nextcloud WebDAV attachments, inspection certificates, OCR labels, SHA-256 hashes, and live storage connection health badge.
+  - **Advanced Filter Panel:** Universal action/reference/doc text search, actor name/email search, module/event dropdown, severity level filter (`ALL`, `INFO`, `WARNING`, `CRITICAL`), and `FROM` / `TO` date bounds.
+  - **Before / After JSON Diff Inspection Modal:** Side-by-side modal displaying the exact prior and committed state payloads with one-click JSON copy.
+  - **Direct Filtered CSV Export:** One-click download of all currently filtered audit records with standard headers and timestamps.
+- Enhanced backend query capabilities in `server/src/modules/audit/audit.routes.ts`:
+  - Added actor regex search joining with `UserModel` on `fullName` and `email`.
+  - Added date range query bounds (`startDate` / `endDate`).
+  - Added multi-field `$or` full-text search across `reason`, `entityRef`, `action`, and `module`.
+  - Populates `actorId` with `fullName`, `email`, and `roleName`.
+- Validation passed: `tsc --noEmit` on `client` and `server` (0 errors); client production build passed; unit tests passed.
+
 ## RULES  for  BURAMLOOP AI DEVELOPMENT
 
 1. Inspect existing code before proposing changes.

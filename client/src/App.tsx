@@ -28,6 +28,7 @@ import { ProcessingWorkspace } from './pages/ProcessingWorkspace';
 import { ShipmentLotsWorkspace } from './pages/ShipmentLotsWorkspace';
 import { AdminCostsWorkspace } from './pages/AdminCostsWorkspace';
 import { TraceabilityAuditWorkspace } from './pages/TraceabilityAuditWorkspace';
+import { AdminAuditAndComplianceWorkspace } from './pages/AdminAuditAndComplianceWorkspace';
 import { LandingWithLoginPage } from './pages/LandingWithLoginPage';
 import { toUserSession } from './lib/authSession';
 import { UserAndProfileWorkspace } from './pages/UserAndProfileWorkspace';
@@ -856,9 +857,12 @@ export const App: React.FC = () => {
         <AdminCostsWorkspace user={user} />
       )}
 
-      {(activeModule === 'TRACEABILITY' ||
-        activeModule === 'AUDIT_DOCS') && (
+      {activeModule === 'TRACEABILITY' && (
         <TraceabilityAuditWorkspace user={user} />
+      )}
+
+      {activeModule === 'AUDIT_DOCS' && (
+        <AdminAuditAndComplianceWorkspace user={user} />
       )}
       {activeModule === 'USER_PROFILE' && (
         <UserAndProfileWorkspace
