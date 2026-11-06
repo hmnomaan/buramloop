@@ -20,14 +20,19 @@ import {
   Activity,
   Layers,
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  SlidersHorizontal,
+  Sparkles,
 } from 'lucide-react';
 import { UserSession } from '../types/erp';
 import { StatusBadge } from '../components/ui/IndustrialPrimitives';
 import { apiClient } from '../lib/apiClient';
 
 type AuditTab = 'AUDIT_TRAIL' | 'STOCK_LEDGER' | 'EXPORT_HISTORY' | 'DOCUMENTS';
-
 type SeverityLevel = 'ALL' | 'INFO' | 'WARNING' | 'CRITICAL';
+type DiffViewMode = 'VISUAL_DIFF' | 'RAW_JSON';
 
 interface AuditRecord {
   _id: string;
@@ -95,6 +100,13 @@ interface AttachmentRecord {
   createdAt: string;
 }
 
+interface KeyDiff {
+  key: string;
+  type: 'ADDED' | 'REMOVED' | 'MODIFIED' | 'UNCHANGED';
+  beforeVal: unknown;
+  afterVal: unknown;
+}
+
 function deriveSeverity(action: string, module: string): 'INFO' | 'WARNING' | 'CRITICAL' {
   const upperAction = action.toUpperCase();
   const upperModule = module.toUpperCase();
@@ -105,7 +117,8 @@ function deriveSeverity(action: string, module: string): 'INFO' | 'WARNING' | 'C
     upperAction.includes('VOID') ||
     upperAction.includes('DELETE') ||
     upperAction.includes('CRITICAL') ||
-    upperAction.includes('DEVIATION_MISMATCH')
+    upperAction.includes('DEVIATION_MISMATCH') ||
+    upperAction.includes('REJECT')
   ) {
     return 'CRITICAL';
   }
@@ -119,6 +132,31 @@ function deriveSeverity(action: string, module: string): 'INFO' | 'WARNING' | 'C
     return 'WARNING';
   }
   return 'INFO';
+}
+
+function computeKeyDiffs(before: unknown, after: unknown): KeyDiff[] {
+  const b = (typeof before === 'object' && before !== null ? before : {}) as Record<string, unknown>;
+  const a = (typeof after === 'object' && after !== null ? after : {}) as Record<string, unknown>;
+  const allKeys = Array.from(new Set([...Object.keys(b), ...Object.keys(a)])).sort();
+
+  return allKeys.map((key) => {
+    const hasB = key in b;
+    const hasA = key in a;
+    const valB = b[key];
+    const valA = a[key];
+
+    if (!hasB && hasA) {
+      return { key, type: 'ADDED', beforeVal: undefined, afterVal: valA };
+    }
+    if (hasB && !hasA) {
+      return { key, type: 'REMOVED', beforeVal: valB, afterVal: undefined };
+    }
+    const isEq = JSON.stringify(valB) === JSON.stringify(valA);
+    if (!isEq) {
+      return { key, type: 'MODIFIED', beforeVal: valB, afterVal: valA };
+    }
+    return { key, type: 'UNCHANGED', beforeVal: valB, afterVal: valA };
+  });
 }
 
 export const AdminAuditAndComplianceWorkspace: React.FC<{
@@ -135,6 +173,10 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
   const [filterStartDate, setFilterStartDate] = useState<string>('');
   const [filterEndDate, setFilterEndDate] = useState<string>('');
 
+  // Pagination states
+  const [pageSize, setPageSize] = useState<number>(50);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
   // Data states
   const [auditLogs, setAuditLogs] = useState<AuditRecord[]>([]);
   const [movements, setMovements] = useState<StockMovementRecord[]>([]);
@@ -148,6 +190,8 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
 
   // Detail Diff Modal state
   const [selectedAuditRecord, setSelectedAuditRecord] = useState<AuditRecord | null>(null);
+  const [diffViewMode, setDiffViewMode] = useState<DiffViewMode>('VISUAL_DIFF');
+  const [showUnchangedDiffKeys, setShowUnchangedDiffKeys] = useState<boolean>(false);
   const [hasCopiedDiff, setHasCopiedDiff] = useState<boolean>(false);
 
   // Load Audit Logs
@@ -229,6 +273,11 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
     void loadAttachmentsAndStorage();
   }, [loadAuditLogs, loadStockMovements, loadExportLogs, loadAttachmentsAndStorage]);
 
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterActor, filterModule, filterSeverity, filterStartDate, filterEndDate]);
+
   // Filtered Audit Logs (Severity & in-memory filters)
   const filteredAuditLogs = useMemo(() => {
     return auditLogs.filter((log) => {
@@ -239,6 +288,14 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
       return true;
     });
   }, [auditLogs, filterSeverity]);
+
+  // Paginated slice for current page
+  const paginatedAuditLogs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredAuditLogs.slice(start, start + pageSize);
+  }, [filteredAuditLogs, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(filteredAuditLogs.length / pageSize) || 1;
 
   // Filtered Stock Movements
   const filteredStockMovements = useMemo(() => {
@@ -290,6 +347,32 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
     setFilterSeverity('ALL');
     setFilterStartDate('');
     setFilterEndDate('');
+    setCurrentPage(1);
+  };
+
+  // Quick Date Presets
+  const applyDatePreset = (preset: 'TODAY' | '24H' | '7D' | '30D' | 'ALL') => {
+    const now = new Date();
+    if (preset === 'ALL') {
+      setFilterStartDate('');
+      setFilterEndDate('');
+    } else if (preset === 'TODAY') {
+      const todayStr = now.toISOString().slice(0, 10);
+      setFilterStartDate(todayStr);
+      setFilterEndDate(todayStr);
+    } else if (preset === '24H') {
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      setFilterStartDate(yesterday.toISOString().slice(0, 10));
+      setFilterEndDate(now.toISOString().slice(0, 10));
+    } else if (preset === '7D') {
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      setFilterStartDate(sevenDaysAgo.toISOString().slice(0, 10));
+      setFilterEndDate(now.toISOString().slice(0, 10));
+    } else if (preset === '30D') {
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      setFilterStartDate(thirtyDaysAgo.toISOString().slice(0, 10));
+      setFilterEndDate(now.toISOString().slice(0, 10));
+    }
   };
 
   // Export Filtered Audit to CSV
@@ -510,7 +593,7 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
           {/* Date Range: From */}
           <div>
             <label className="block text-[10px] text-buram-muted uppercase tracking-wider mb-1">
-              From
+              From Date
             </label>
             <div className="relative">
               <Calendar className="w-3.5 h-3.5 text-buram-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -526,7 +609,7 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
           {/* Date Range: To */}
           <div>
             <label className="block text-[10px] text-buram-muted uppercase tracking-wider mb-1">
-              To
+              To Date
             </label>
             <div className="relative">
               <Calendar className="w-3.5 h-3.5 text-buram-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -536,6 +619,32 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
                 onChange={(e) => setFilterEndDate(e.target.value)}
                 className="w-full bg-buram-bg border border-buram-border rounded-lg pl-8 pr-3 py-2 text-xs text-buram-text focus:border-buram-amber"
               />
+            </div>
+          </div>
+
+          {/* Quick Date Presets Strip */}
+          <div className="sm:col-span-2 lg:col-span-2 flex flex-col justify-end">
+            <span className="text-[10px] text-buram-muted uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <Clock className="w-3 h-3 text-buram-amber" />
+              <span>Quick Date Presets:</span>
+            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {[
+                { id: 'TODAY', label: 'Today' },
+                { id: '24H', label: 'Last 24h' },
+                { id: '7D', label: 'Last 7 Days' },
+                { id: '30D', label: 'Last 30 Days' },
+                { id: 'ALL', label: 'All Time' },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => applyDatePreset(p.id as any)}
+                  className="px-2.5 py-1.5 rounded-lg bg-buram-bg border border-buram-border hover:border-buram-amber text-[10px] font-mono text-buram-text hover:text-buram-amber transition-colors shadow-sm"
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -627,8 +736,26 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-xs font-mono text-buram-muted">
-              <span>Showing {filteredAuditLogs.length} of {auditLogs.length} events</span>
+
+            {/* Density & Count Selector */}
+            <div className="flex items-center gap-3 text-xs font-mono text-buram-muted">
+              <span>Showing {paginatedAuditLogs.length} of {filteredAuditLogs.length} events</span>
+              <div className="flex items-center gap-1.5 pl-2 border-l border-buram-border">
+                <span className="text-[10px] uppercase text-buram-muted">Per page:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="bg-buram-bg border border-buram-border rounded px-2 py-0.5 text-xs text-buram-text"
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={250}>250</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -650,14 +777,14 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
                 </tr>
               </thead>
               <tbody className="divide-y divide-buram-border/40">
-                {filteredAuditLogs.length === 0 ? (
+                {paginatedAuditLogs.length === 0 ? (
                   <tr>
                     <td colSpan={11} className="py-10 text-center text-buram-muted">
                       No audit events matching current filters.
                     </td>
                   </tr>
                 ) : (
-                  filteredAuditLogs.map((log) => {
+                  paginatedAuditLogs.map((log) => {
                     const actorName =
                       typeof log.actorId === 'object'
                         ? log.actorId?.fullName || log.actorId?.email || 'System'
@@ -681,9 +808,14 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
                           })}
                         </td>
                         <td className="py-3 px-3">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-buram-elevated border border-buram-border uppercase text-buram-amber">
+                          <button
+                            type="button"
+                            onClick={() => setFilterModule(log.module)}
+                            title={`Filter by module ${log.module}`}
+                            className="px-2 py-0.5 rounded text-[10px] font-bold bg-buram-elevated border border-buram-border uppercase text-buram-amber hover:border-buram-amber transition-colors"
+                          >
                             {log.module}
-                          </span>
+                          </button>
                         </td>
                         <td className="py-3 px-3 text-buram-text font-sans font-medium">
                           {log.action}
@@ -693,16 +825,24 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
                         </td>
                         <td className="py-3 px-3">
                           {log.entityRef ? (
-                            <span className="px-2 py-0.5 rounded bg-buram-bg border border-buram-border font-bold text-buram-gold">
+                            <button
+                              type="button"
+                              onClick={() => setSearchQuery(log.entityRef!)}
+                              title={`Search reference ${log.entityRef}`}
+                              className="px-2 py-0.5 rounded bg-buram-bg border border-buram-border font-bold text-buram-gold hover:border-buram-amber transition-colors"
+                            >
                               {log.entityRef}
-                            </span>
+                            </button>
                           ) : (
                             <span className="text-buram-muted">—</span>
                           )}
                         </td>
                         <td className="py-3 px-3">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          <button
+                            type="button"
+                            onClick={() => setFilterSeverity(sev)}
+                            title={`Filter by severity ${sev}`}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-transform hover:scale-105 ${
                               sev === 'CRITICAL'
                                 ? 'bg-buram-critical/20 text-buram-critical border border-buram-critical/40'
                                 : sev === 'WARNING'
@@ -711,13 +851,20 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
                             }`}
                           >
                             {sev}
-                          </span>
+                          </button>
                         </td>
                         <td className="py-3 px-3 text-buram-muted whitespace-nowrap">
                           {log.ipAddress || '127.0.0.1'}
                         </td>
                         <td className="py-3 px-3 text-buram-text font-sans">
-                          {actorName}
+                          <button
+                            type="button"
+                            onClick={() => setFilterActor(actorName)}
+                            title={`Filter by actor ${actorName}`}
+                            className="hover:text-buram-amber transition-colors text-left"
+                          >
+                            {actorName}
+                          </button>
                         </td>
                         <td className="py-3 px-3">
                           <span className="px-2 py-0.5 rounded text-[10px] bg-buram-amber/15 text-buram-gold border border-buram-amber/30 uppercase font-bold">
@@ -730,11 +877,14 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
                         <td className="py-3 px-3 text-right">
                           <button
                             type="button"
-                            onClick={() => setSelectedAuditRecord(log)}
+                            onClick={() => {
+                              setSelectedAuditRecord(log);
+                              setDiffViewMode('VISUAL_DIFF');
+                            }}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-buram-elevated border border-buram-border text-buram-gold hover:border-buram-amber transition-colors text-[11px]"
                           >
                             <Eye className="w-3 h-3" />
-                            <span>Diff</span>
+                            <span>Inspect</span>
                           </button>
                         </td>
                       </tr>
@@ -744,6 +894,36 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Bar */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-buram-border/60 pt-3 text-xs font-mono">
+              <span className="text-buram-muted">
+                Page <span className="font-bold text-buram-text">{currentPage}</span> of{' '}
+                <span className="font-bold text-buram-text">{totalPages}</span> ({filteredAuditLogs.length} total events)
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-buram-elevated border border-buram-border text-buram-text hover:border-buram-amber disabled:opacity-40 transition-colors"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Previous</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-buram-elevated border border-buram-border text-buram-text hover:border-buram-amber disabled:opacity-40 transition-colors"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -1097,32 +1277,143 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
               </div>
             )}
 
-            {/* Side-by-Side Before vs After JSON Diffs */}
-            <div className="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              <div className="space-y-1.5">
-                <span className="text-xs font-mono font-bold text-buram-muted uppercase flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-buram-critical" />
-                  State Before:
-                </span>
-                <pre className="p-3 rounded-lg bg-buram-bg border border-buram-border text-[11px] font-mono text-buram-pale overflow-x-auto max-h-72">
-                  {selectedAuditRecord.before
-                    ? JSON.stringify(selectedAuditRecord.before, null, 2)
-                    : '// No prior state recorded'}
-                </pre>
+            {/* View Mode Switcher: Visual Key Diff vs Raw JSON */}
+            <div className="flex items-center justify-between border-b border-buram-border pb-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDiffViewMode('VISUAL_DIFF')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono font-bold transition-all ${
+                    diffViewMode === 'VISUAL_DIFF'
+                      ? 'bg-buram-amber text-buram-bg shadow-sm'
+                      : 'text-buram-muted hover:text-buram-text bg-buram-elevated'
+                  }`}
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Visual Key Diff</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDiffViewMode('RAW_JSON')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-mono font-bold transition-all ${
+                    diffViewMode === 'RAW_JSON'
+                      ? 'bg-buram-amber text-buram-bg shadow-sm'
+                      : 'text-buram-muted hover:text-buram-text bg-buram-elevated'
+                  }`}
+                >
+                  <FileText className="w-3 h-3" />
+                  <span>Raw JSON</span>
+                </button>
               </div>
 
-              <div className="space-y-1.5">
-                <span className="text-xs font-mono font-bold text-buram-success uppercase flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-buram-success" />
-                  State After (Committed):
-                </span>
-                <pre className="p-3 rounded-lg bg-buram-bg border border-buram-border text-[11px] font-mono text-buram-gold overflow-x-auto max-h-72">
-                  {selectedAuditRecord.after
-                    ? JSON.stringify(selectedAuditRecord.after, null, 2)
-                    : '// No mutation payload'}
-                </pre>
-              </div>
+              {diffViewMode === 'VISUAL_DIFF' && (
+                <label className="flex items-center gap-1.5 text-[11px] font-mono text-buram-muted cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showUnchangedDiffKeys}
+                    onChange={(e) => setShowUnchangedDiffKeys(e.target.checked)}
+                    className="rounded bg-buram-bg border-buram-border text-buram-amber focus:ring-0"
+                  />
+                  <span>Show unchanged keys</span>
+                </label>
+              )}
             </div>
+
+            {/* Diff Content Rendering */}
+            {diffViewMode === 'VISUAL_DIFF' ? (
+              <div className="flex-1 overflow-y-auto space-y-2 max-h-80 pr-1">
+                {(() => {
+                  const diffs = computeKeyDiffs(selectedAuditRecord.before, selectedAuditRecord.after);
+                  const filteredDiffs = showUnchangedDiffKeys
+                    ? diffs
+                    : diffs.filter((d) => d.type !== 'UNCHANGED');
+
+                  if (filteredDiffs.length === 0) {
+                    return (
+                      <div className="p-6 text-center text-xs font-mono text-buram-muted bg-buram-bg/50 rounded-lg border border-buram-border">
+                        No structural state differences detected between before and after snapshots.
+                      </div>
+                    );
+                  }
+
+                  return filteredDiffs.map((diff) => (
+                    <div
+                      key={diff.key}
+                      className={`p-2.5 rounded-lg border text-xs font-mono flex flex-col gap-1 ${
+                        diff.type === 'ADDED'
+                          ? 'bg-buram-success/10 border-buram-success/30 text-buram-success'
+                          : diff.type === 'REMOVED'
+                          ? 'bg-buram-critical/10 border-buram-critical/30 text-buram-critical'
+                          : diff.type === 'MODIFIED'
+                          ? 'bg-buram-warning/10 border-buram-warning/30 text-buram-warning'
+                          : 'bg-buram-bg/40 border-buram-border/60 text-buram-muted'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="flex items-center gap-1.5">
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              diff.type === 'ADDED'
+                                ? 'bg-buram-success'
+                                : diff.type === 'REMOVED'
+                                ? 'bg-buram-critical'
+                                : diff.type === 'MODIFIED'
+                                ? 'bg-buram-warning'
+                                : 'bg-buram-muted'
+                            }`}
+                          />
+                          <span>{diff.key}</span>
+                        </span>
+                        <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-black/30">
+                          {diff.type}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] pt-1">
+                        <div>
+                          <span className="text-[10px] text-buram-muted block uppercase">Previous:</span>
+                          <span className="break-all font-mono">
+                            {diff.beforeVal !== undefined ? JSON.stringify(diff.beforeVal) : '<empty>'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-buram-muted block uppercase">Committed:</span>
+                          <span className="break-all font-mono font-bold">
+                            {diff.afterVal !== undefined ? JSON.stringify(diff.afterVal) : '<empty>'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            ) : (
+              /* Side-by-Side Before vs After JSON Diffs */
+              <div className="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                <div className="space-y-1.5">
+                  <span className="text-xs font-mono font-bold text-buram-muted uppercase flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-buram-critical" />
+                    State Before:
+                  </span>
+                  <pre className="p-3 rounded-lg bg-buram-bg border border-buram-border text-[11px] font-mono text-buram-pale overflow-x-auto max-h-72">
+                    {selectedAuditRecord.before
+                      ? JSON.stringify(selectedAuditRecord.before, null, 2)
+                      : '// No prior state recorded'}
+                  </pre>
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-xs font-mono font-bold text-buram-success uppercase flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-buram-success" />
+                    State After (Committed):
+                  </span>
+                  <pre className="p-3 rounded-lg bg-buram-bg border border-buram-border text-[11px] font-mono text-buram-gold overflow-x-auto max-h-72">
+                    {selectedAuditRecord.after
+                      ? JSON.stringify(selectedAuditRecord.after, null, 2)
+                      : '// No mutation payload'}
+                  </pre>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -553,8 +553,10 @@ check.
   - Decoupled module routing in `client/src/App.tsx`: `TRACEABILITY` routes exclusively to the product provenance explorer (`TraceabilityAuditWorkspace.tsx`), while `AUDIT_DOCS` routes to the universal cross-module governance center (`AdminAuditAndComplianceWorkspace.tsx`).
   - Built `client/src/pages/AdminAuditAndComplianceWorkspace.tsx` combining features from both attached user compliance and audit designs:
     - 4-tab navigation with live counts: `Audit trail`, `Stock ledger`, `Export history`, `Documents`.
-    - Advanced filter panel: Search (Action/Reference/Doc), Actor (Name/Email), Module dropdown, Severity dropdown (`ALL`, `INFO`, `WARNING`, `CRITICAL`), and `FROM` / `TO` date bounds.
-    - Side-by-side Before/After JSON diff inspection modal with one-click JSON clipboard copy.
+    - Advanced filter panel: Search (Action/Reference/Doc), Actor (Name/Email), Module dropdown, Severity dropdown (`ALL`, `INFO`, `WARNING`, `CRITICAL`), `FROM` / `TO` date bounds, and Quick Date Presets (`Today`, `Last 24h`, `Last 7 Days`, `Last 30 Days`, `All Time`).
+    - Interactive table cell click-to-filter on Actor name, Module, Entity reference, and Severity tag.
+    - Selectable table view density (`25`, `50`, `100`, `250` rows per page) and previous/next page navigation.
+    - Side-by-side Before/After mutation inspection modal with visual key-by-key difference tracking (`computeKeyDiffs`: Added, Removed, Modified keys with previous vs. committed values) and Raw JSON with one-click copy.
     - Direct filtered CSV export with standard column mappings.
     - Live Nextcloud WebDAV storage connection health indicator.
   - Upgraded backend query handling in `server/src/modules/audit/audit.routes.ts`: actor regex lookup via `UserModel`, date bounds, full-text `$or` search on reasons/references/actions/modules, and actor population.

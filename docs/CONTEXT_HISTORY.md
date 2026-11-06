@@ -814,8 +814,10 @@ and [roadmap](./ROADMAP.md) for active status.*
     2. **Stock ledger:** Append-only physical and status movements ledger (GoBD / EU 178/2002) with signed weight delta ($\Delta$), flow locations, and reasons.
     3. **Export history:** Audited dataset dumps, formats, row counts, and Nextcloud archive file paths.
     4. **Documents:** Nextcloud WebDAV attachments, inspection certificates, OCR labels, SHA-256 hashes, and live storage connection health badge.
-  - **Advanced Filter Panel:** Universal action/reference/doc text search, actor name/email search, module/event dropdown, severity level filter (`ALL`, `INFO`, `WARNING`, `CRITICAL`), and `FROM` / `TO` date bounds.
-  - **Before / After JSON Diff Inspection Modal:** Side-by-side modal displaying the exact prior and committed state payloads with one-click JSON copy.
+  - **Advanced Filter Panel:** Universal action/reference/doc text search, actor name/email search, module/event dropdown, severity level filter (`ALL`, `INFO`, `WARNING`, `CRITICAL`), and `FROM` / `TO` date bounds with Quick Date Presets (`Today`, `Last 24h`, `Last 7 Days`, `Last 30 Days`, `All Time`).
+  - **Interactive Table Cell Click-to-Filter:** Direct clicking on any Actor name, Module pill, Entity reference badge, or Severity tag automatically populates and activates the respective filter.
+  - **Pagination & Density Controls:** Page size selector (`25`, `50`, `100`, `250` rows per page) with previous/next pagination controls.
+  - **Smart Visual Key-by-Key Diff Inspector (`computeKeyDiffs`):** Modal inspector with toggle between Visual Key Diff (color-coded `ADDED`, `REMOVED`, `MODIFIED` keys with previous vs. committed values) and Raw JSON with one-click clipboard copy.
   - **Direct Filtered CSV Export:** One-click download of all currently filtered audit records with standard headers and timestamps.
 - Enhanced backend query capabilities in `server/src/modules/audit/audit.routes.ts`:
   - Added actor regex search joining with `UserModel` on `fullName` and `email`.
