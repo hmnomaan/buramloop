@@ -16,6 +16,8 @@ coverage/
 # Kilo Code
 .kilo/
 
+# Scratch files
+scratch/
 # Logs
 *.log
 logs/
@@ -33,5 +35,5 @@ logs/
 .DS_Store
 Thumbs.db
 
-# VS?Code workspace settings – keep local only
+# VS?Code workspace settings ï¿½ keep local only
 .vscode/

@@ -606,12 +606,14 @@ retain origin country/weight shares but omit source prices and cost shares.
 | `POST` | `/attachments/:id/void` | `attachments:write`; body `reason`; destructive status change. |
 | `GET` | `/costs` | `reports:read`. |
 | `POST` | `/costs/generate` | Admin only; body `reason`; generates a report. |
-| `GET` | `/trace?code=<record-code>` or `/trace/:code` | `trace:read`; use a real local record code. |
+| `GET` | `/trace/suggestions` | `trace:read`; returns recent live DB codes for quick chip selection. |
+| `GET` | `/trace?code=<record-code>` or `/trace/:code` | `trace:read`; bi-directional trace with DIN 1333/5008 formatting, HonigV QSI lab parameters, and R9/R15 price masking. |
+| `POST` | `/trace/:code/regulatory-hold` | `qa:approve`, `management:approve`, or `stock:write`; body `{ "code": "...", "reason": "..." }`; executes atomic IFS Food v8 Clause 4.18.2 instant regulatory hold. |
 | `GET` | `/exports/logs` | `exports:run`. |
 | `POST` | `/exports/run` | `exports:run`; JSON fields can include `dataset`, `format`, and `saveToNextcloud`. This creates an export. |
 | `GET` | `/notifications` | Any authenticated user; results depend on role/targeting. |
 | `POST` | `/notifications/:id/acknowledge` | Any authenticated user; use an actual notification ID. |
-| `GET` | `/audit` | `audit:read`; optional filters: `module`, `entityType`, `entityRef`. |
+| `GET` | `/audit` | `audit:read`; advanced multi-parameter filter: `search` (full-text on reason/ref/action/module), `actor` (regex on fullName/email), `module`, `action`, `actorRole`, `startDate`, `endDate`, `severity`, and `limit`. |
 
 For cost and trace authorization checks, use records created in a disposable
 local workflow:

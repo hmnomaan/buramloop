@@ -1,6 +1,6 @@
 
 
-*Last documentation sync: 2026-11-02*
+*Last documentation sync: 2026-11-06*
 
 This is the concise project index and handoff pointer. For full verified
 implementation status, requirements, decisions to confirm, and the next-step
@@ -27,12 +27,28 @@ seed command, health checks, and stop procedures. Never commit `.env` values.
 ## Current status summary
 
 The latest workspace typecheck, production build, and server test run passed;
-the server suite currently has nine suites and 32 tests. Receiving accepts
-exact total kg/ton mass and displays the computed average package weight;
+the server suite currently has 15 suites and 57 tests, including in-memory
+replica-set workflows for sourcing-to-receipt and receipt-to-trace/export.
+Receiving accepts exact total kg/ton mass and displays computed package weights;
 source price entry is optional, Admin/Management-only in the UI, and enforced
 at the API. Batch planning is API-backed and supports selected available
-rework. Authentication/session restoration and logout exist. Many business
-flows still lack integration/acceptance tests.
+rework. Authentication/session restoration and logout exist.
+
+Recent major milestones delivered and verified:
+- **German DIN 1333 & DIN 5008 Typographic Standardization (`shared/src/schemas/formatters-de.ts`):**
+  German tabular decimal comma formatting (`6.704,0 kg`, `68,7 %`, `8,2 mg/kg`), DIN 5008 dates (`DD.MM.YYYY`), and 24-hour Berlin time (`DD.MM.YYYY · HH:mm Uhr MEZ`).
+- **Multi-Language Regulatory Traceability (DE | TR | EN | BN):**
+  Four-language support across all headings, badges, and inspection labels (*Amtssprache Deutsch* per VwVfG § 23, Turkish *Türkçe*, English, and Bangla *বাংলা*).
+- **HonigV Anlage 2 Physicochemical Parameter Surfacing:**
+  Joined from `LabReportModel` onto every traced `IncomingLot` (moisture % <= 20,0%, HMF <= 40 mg/kg, diastase >= 8 DN, C4 sugar, and NMR authenticity).
+- **IFS Food v8 Clause 4.18.2 Instant Regulatory Hold (`POST /api/v1/trace/:code/regulatory-hold`):**
+  Atomically locks unconsumed drums (`status: 'Quarantine'`), transitions non-shipped downstream shipment lots to `QA_HOLD`, appends stock movement records, emits critical notifications, and records immutable audit logs inside an ACID transaction.
+- **Decoupled Admin Audit & Compliance Center (`AdminAuditAndComplianceWorkspace.tsx`):**
+  Completely separated from product traceability (`activeModule === 'AUDIT_DOCS'`). Four-tab governance architecture (`Audit trail`, `Stock ledger`, `Export history`, `Documents`), multi-parameter filter panel with quick date presets, side-by-side Visual Key Diff modal, live Nextcloud WebDAV health monitor, and direct CSV export download.
+- **In-App & PWA Native Push Notifications:**
+  Role-targeted push alerts with Web Audio synthesized chimes, bottom 2s auto-fading toasts, notification bell hover preview + click-to-pin open, and PWA Service Worker push routing (`sw.js`, `manifest.json`).
+- **Dynamic Data Binding & Resilient Envelope Unwrapping:**
+  Guaranteed dynamic data delivery across all endpoints with dual-envelope parsing for `{ ok, data }` and raw arrays.
 
 Important unfinished scope:
 
