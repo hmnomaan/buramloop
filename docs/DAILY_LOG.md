@@ -561,7 +561,7 @@ check.
     - Live Nextcloud WebDAV storage connection health indicator.
   - Upgraded backend query handling in `server/src/modules/audit/audit.routes.ts`: actor regex lookup via `UserModel`, date bounds, full-text `$or` search on reasons/references/actions/modules, and actor population.
 - **Issues/fixes:** [BL-055](./ISSUES_AND_FIXES.md#resolved).
-- **Validation:** `tsc --noEmit` on `client` and `server` passed (0 errors); client production build passed (`dist/index.html` + chunks); server unit tests passed (`german-standard-trace-hold.test.ts`).
+- **Validation:** `tsc --noEmit` on `client` and `server` passed (0 errors); client production build passed (`dist/index.html` + chunks); server unit tests passed (`german-standard-trace-hold.test.ts`); executed full `e2e-traceability-workflow.test.ts` (BL-039) against a live `MongoMemoryReplSet` verifying dynamic end-to-end receipt, QA review, batch planning, 7-stage processing, shipment, and snapshot-isolated trace lookups; updated `apiClient` response unwrapping across `AdminAuditAndComplianceWorkspace.tsx` and `TraceabilityAuditWorkspace.tsx` ensuring 100% dynamic data binding.
 - **Open/blockers:** Live container deployment and browser acceptance testing remain open.
 
 ## Daily entry template

@@ -202,9 +202,14 @@ export const TraceabilityAuditWorkspace: React.FC<{
 
   const loadSuggestions = useCallback(async () => {
     try {
-      const res = await apiClient.request<string[]>('/trace/suggestions');
-      if (Array.isArray(res) && res.length > 0) {
-        setSuggestedCodes(res);
+      const res = await apiClient.request<string[] | { data: string[] }>('/trace/suggestions');
+      const codes = Array.isArray(res)
+        ? res
+        : res && typeof res === 'object' && Array.isArray((res as any).data)
+        ? (res as any).data
+        : [];
+      if (codes.length > 0) {
+        setSuggestedCodes(codes);
       } else {
         setSuggestedCodes([
           'B-2026-001',
@@ -238,14 +243,18 @@ export const TraceabilityAuditWorkspace: React.FC<{
     setHoldSuccessBanner(null);
 
     try {
-      const res = await apiClient.request<ServerTraceResponse>(
+      const res = await apiClient.request<ServerTraceResponse | { data: ServerTraceResponse }>(
         `/trace/${encodeURIComponent(cleaned)}`
       );
-      setTraceData(res);
+      const data =
+        res && typeof res === 'object' && 'data' in res && !('queriedCode' in res)
+          ? ((res as any).data as ServerTraceResponse)
+          : (res as ServerTraceResponse);
+      setTraceData(data);
       setSelectedCardFilter({
         kind: 'ALL',
         id: '',
-        code: res.queriedCode,
+        code: data.queriedCode,
       });
       setShowAllDrums(false);
     } catch (err) {

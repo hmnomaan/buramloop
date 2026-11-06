@@ -207,11 +207,15 @@ export const AdminAuditAndComplianceWorkspace: React.FC<{
       if (filterEndDate) params.set('endDate', filterEndDate);
       params.set('limit', '500');
 
-      const res = await apiClient.request<{ count: number; data: AuditRecord[] }>(
+      const res = await apiClient.request<AuditRecord[] | { count: number; data: AuditRecord[] }>(
         `/audit?${params.toString()}`
       );
-      if (res && Array.isArray(res.data)) {
-        setAuditLogs(res.data);
+      if (Array.isArray(res)) {
+        setAuditLogs(res);
+      } else if (res && typeof res === 'object' && Array.isArray((res as any).data)) {
+        setAuditLogs((res as any).data);
+      } else {
+        setAuditLogs([]);
       }
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Failed to load audit logs.');
