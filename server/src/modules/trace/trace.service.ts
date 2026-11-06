@@ -1,22 +1,27 @@
+// server/src/modules/trace/trace.service.ts
 import { ClientSession, Types } from 'mongoose';
-import { withSnapshotRead } from '../../config/db';
-import { AppError } from '../../common/errors';
-import {
-  canRoleViewPrices,
-  sanitizeOriginSlicesForRole,
-} from '../../common/price-strip.helper';
 import {
   BatchInputModel,
   BatchModel,
   CustomerModel,
   DrumModel,
   IncomingLotModel,
+  LabReportModel,
+  NotificationModel,
   ProcessStepModel,
   ReworkStockModel,
   ShipmentLotModel,
   StockMovementModel,
   StockPackageModel,
 } from '../../models';
+import { withSnapshotRead, withTransaction } from '../../config/db';
+import { AppError } from '../../common/errors';
+import { recordAudit } from '../../common/audit.helper';
+import {
+  canRoleViewPrices,
+  sanitizeOriginSlicesForRole,
+} from '../../common/price-strip.helper';
+import { roundKg } from '../../../../shared/src/schemas/common';
 
 const COMMERCIAL_FIELDS = [
   'unitPriceEurPerKg',
@@ -44,7 +49,7 @@ function sanitizeRecord<T extends Record<string, unknown>>(
     !Array.isArray(sanitized['labelData'])
   ) {
     const labelData = {
-      ...sanitized['labelData'] as Record<string, unknown>,
+      ...(sanitized['labelData'] as Record<string, unknown>),
     };
     delete labelData.unitPriceEurPerKg;
     sanitized['labelData'] = labelData;
@@ -65,7 +70,7 @@ function sanitizeIncomingLot(
     sanitized.labelData &&
     typeof sanitized.labelData === 'object' &&
     !Array.isArray(sanitized.labelData)
-      ? { ...sanitized.labelData as Record<string, unknown> }
+      ? { ...(sanitized.labelData as Record<string, unknown>) }
       : undefined;
   if (labelData) {
     delete labelData.supplierName;
@@ -76,7 +81,7 @@ function sanitizeIncomingLot(
     sanitized.labelMetadata &&
     typeof sanitized.labelMetadata === 'object' &&
     !Array.isArray(sanitized.labelMetadata)
-      ? { ...sanitized.labelMetadata as Record<string, unknown> }
+      ? { ...(sanitized.labelMetadata as Record<string, unknown>) }
       : undefined;
   if (labelMetadata) {
     delete labelMetadata.extractedSupplier;
@@ -91,14 +96,46 @@ function sanitizeIncomingLot(
   };
 }
 
-function idsAsObjectIds(ids: Set<string>): Types.ObjectId[] {
-  return [...ids].map((id) => new Types.ObjectId(id));
-}
-
 export class TraceService {
   /**
-   * Snapshot-isolated bi-directional trace; R9 price fields and Inspector
-   * counterparty names are filtered before the response leaves the service.
+   * Returns up to 6 real entity codes from the database for the "TRY ONE OF YOUR RECORDS" chips
+   */
+  static async listSuggestedTraceCodes(): Promise<string[]> {
+    const batches = await BatchModel.find({ isVoid: false })
+      .sort({ createdAt: -1 })
+      .limit(2)
+      .select('processNo')
+      .lean();
+    const drums = await DrumModel.find()
+      .sort({ createdAt: -1 })
+      .limit(2)
+      .select('drumCode')
+      .lean();
+    const lots = await IncomingLotModel.find()
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .select('lotNo')
+      .lean();
+    const shipments = await ShipmentLotModel.find({ isVoid: false })
+      .sort({ createdAt: -1 })
+      .limit(1)
+      .select('shipmentLotNo')
+      .lean();
+
+    const codes: string[] = [
+      ...batches.map((b) => b.processNo),
+      ...drums.map((d) => d.drumCode),
+      ...lots.map((l) => l.lotNo),
+      ...shipments.map((s) => s.shipmentLotNo),
+    ].filter(Boolean);
+
+    return Array.from(new Set(codes));
+  }
+
+  /**
+   * Snapshot-isolated bi-directional traceability lookup for Government Inspection [R11]
+   * Surfaces HonigV QSI lab parameters on IncomingLots and masks commercial prices per R9.
+   * Executes sequentially within the session to prevent MongoDB transaction counter tearing.
    */
   static async traceByReference(queryCode: string, actorRole: string) {
     const cleanCode = queryCode.trim().toUpperCase();
@@ -109,8 +146,8 @@ export class TraceService {
       );
     }
 
-    const showPrices = canRoleViewPrices(actorRole);
     const isInspector = actorRole === 'Inspector' || actorRole === 'INSPECTOR';
+    const showPrices = canRoleViewPrices(actorRole);
 
     return withSnapshotRead(async (session: ClientSession) => {
       const directLot = await IncomingLotModel.findOne({ lotNo: cleanCode })
@@ -121,29 +158,29 @@ export class TraceService {
       })
         .session(session)
         .lean();
-      const directPackage = await StockPackageModel.findOne({
-        packageCode: cleanCode,
-      })
+      const directBatch = await BatchModel.findOne({ processNo: cleanCode, isVoid: false })
         .session(session)
         .lean();
-      const directBatch = await BatchModel.findOne({
-        processNo: cleanCode,
-        isVoid: false,
-      })
+      const directRework = await ReworkStockModel.findOne({ reworkNo: cleanCode, isVoid: false })
         .session(session)
         .lean();
-      const directRework = await ReworkStockModel.findOne({
-        reworkNo: cleanCode,
-        isVoid: false,
-      })
+      const directShipment = await ShipmentLotModel.findOne({ shipmentLotNo: cleanCode, isVoid: false })
         .session(session)
         .lean();
-      const directShipment = await ShipmentLotModel.findOne({
-        shipmentLotNo: cleanCode,
-        isVoid: false,
-      })
+      const directPackage = await StockPackageModel.findOne({ packageCode: cleanCode })
         .session(session)
         .lean();
+
+      if (
+        !directLot &&
+        !directDrum &&
+        !directBatch &&
+        !directRework &&
+        !directShipment &&
+        !directPackage
+      ) {
+        throw AppError.notFound('Traceable entity', cleanCode);
+      }
 
       const batchIds = new Set<string>();
       if (directBatch) batchIds.add(String(directBatch._id));
@@ -179,6 +216,8 @@ export class TraceService {
           .lean();
         inputs.forEach((input) => batchIds.add(String(input.batchId)));
       }
+
+      // Traverse rework links up to 10 depths to discover parent batches
       const visitedBatchIds = new Set<string>();
       for (let depth = 0; depth < 10; depth += 1) {
         const newBatchIds = [...batchIds].filter((id) => !visitedBatchIds.has(id));
@@ -205,84 +244,61 @@ export class TraceService {
         sourceReworks.forEach((rework) => batchIds.add(String(rework.sourceBatchId)));
       }
 
-      const batchObjectIds = idsAsObjectIds(batchIds);
-      const batches = await BatchModel.find({
-        _id: { $in: batchObjectIds },
-        isVoid: false,
-      })
+      const batchObjectIds = Array.from(batchIds).map((id) => new Types.ObjectId(id));
+
+      const batches = await BatchModel.find({ _id: { $in: batchObjectIds }, isVoid: false })
         .session(session)
         .lean();
-      const batchInputs = await BatchInputModel.find({
-        batchId: { $in: batchObjectIds },
-        isVoid: false,
-      })
+      const batchInputs = await BatchInputModel.find({ batchId: { $in: batchObjectIds }, isVoid: false })
         .session(session)
         .lean();
-      const processSteps = await ProcessStepModel.find({
-        batchId: { $in: batchObjectIds },
-        isVoid: false,
-      })
+      const processSteps = await ProcessStepModel.find({ batchId: { $in: batchObjectIds }, isVoid: false })
         .sort({ stepSequence: 1 })
-        .session(session)
-        .lean();
-      const shipmentLots = await ShipmentLotModel.find({
-        batchId: { $in: batchObjectIds },
-        isVoid: false,
-      })
         .session(session)
         .lean();
       const reworkStocks = await ReworkStockModel.find({
         $or: [
           { sourceBatchId: { $in: batchObjectIds } },
-          {
-            _id: {
-              $in: batchInputs
-                .map((input) => input.reworkStockId)
-                .filter((id): id is Types.ObjectId => Boolean(id)),
-            },
-          },
           ...(directRework ? [{ _id: directRework._id }] : []),
         ],
         isVoid: false,
       })
-        .sort({ createdAt: 1 })
+        .session(session)
+        .lean();
+      const shipmentLots = await ShipmentLotModel.find({ batchId: { $in: batchObjectIds }, isVoid: false })
         .session(session)
         .lean();
 
       const incomingLotIds = new Set<string>();
       if (directLot) incomingLotIds.add(String(directLot._id));
-      if (directDrum?.incomingLotId) {
-        incomingLotIds.add(String(directDrum.incomingLotId));
+      if (directDrum?.incomingLotId) incomingLotIds.add(String(directDrum.incomingLotId));
+      if (directPackage?.incomingLotId) incomingLotIds.add(String(directPackage.incomingLotId));
+      for (const inp of batchInputs) {
+        if (inp.incomingLotId) incomingLotIds.add(String(inp.incomingLotId));
       }
-      if (directPackage?.incomingLotId) {
-        incomingLotIds.add(String(directPackage.incomingLotId));
-      }
-      for (const input of batchInputs) {
-        if (input.incomingLotId) incomingLotIds.add(String(input.incomingLotId));
-        for (const slice of input.originSnapshot ?? []) {
+      for (const b of batches) {
+        for (const slice of b.originComposition || []) {
           incomingLotIds.add(String(slice.incomingLotId));
         }
       }
-      for (const batch of batches) {
-        for (const slice of batch.originComposition ?? []) {
-          incomingLotIds.add(String(slice.incomingLotId));
-        }
-      }
-      for (const rework of reworkStocks) {
-        for (const slice of rework.origin ?? []) {
+      for (const rw of reworkStocks) {
+        for (const slice of rw.origin || []) {
           incomingLotIds.add(String(slice.incomingLotId));
         }
       }
 
-      const lotObjectIds = idsAsObjectIds(incomingLotIds);
+      const lotObjectIds = Array.from(incomingLotIds).map((id) => new Types.ObjectId(id));
+      const incomingLots = await IncomingLotModel.find({ _id: { $in: lotObjectIds } })
+        .session(session)
+        .lean();
+      const labReports = await LabReportModel.find({ incomingLotId: { $in: lotObjectIds } })
+        .sort({ createdAt: -1 })
+        .session(session)
+        .lean();
+
       const relatedStockQuery = {
         incomingLotId: { $in: lotObjectIds },
       };
-      const incomingLots = await IncomingLotModel.find({
-        _id: { $in: lotObjectIds },
-      })
-        .session(session)
-        .lean();
       const drums = await DrumModel.find({
         $or: [
           relatedStockQuery,
@@ -294,7 +310,7 @@ export class TraceService {
         .limit(500)
         .session(session)
         .lean();
-      const stockPackages = await StockPackageModel.find({
+      const packages = await StockPackageModel.find({
         $or: [
           relatedStockQuery,
           ...(directPackage ? [{ _id: directPackage._id }] : []),
@@ -317,31 +333,77 @@ export class TraceService {
         .session(session)
         .lean();
 
-      if (
-        !directLot &&
-        !directDrum &&
-        !directPackage &&
-        !directBatch &&
-        !directRework &&
-        !directShipment
-      ) {
-        throw AppError.notFound('Traceable entity', cleanCode);
+      const labByLotId = new Map<string, (typeof labReports)[number]>();
+      for (const rep of labReports) {
+        const key = rep.incomingLotId.toHexString();
+        if (!labByLotId.has(key)) {
+          labByLotId.set(key, rep);
+        }
       }
 
-      const customers = await CustomerModel.find({
-        _id: { $in: shipmentLots.map((shipment) => shipment.customerId) },
-      })
+      const customerIds = shipmentLots.map((s) => s.customerId);
+      const customers = await CustomerModel.find({ _id: { $in: customerIds } })
         .session(session)
         .lean();
-      const sanitizedCustomers = customers.map((customer) => ({
-        _id: customer._id,
-        code: customer.code,
-        name: isInspector
-          ? `INSPECTOR-REDACTED-${customer.country}`
-          : customer.name,
-        country: customer.country,
-        allowedCountries: customer.allowedCountries,
+
+      const customerMap = new Map(
+        customers.map((c) => [
+          c._id.toHexString(),
+          isInspector ? `BUYER-${c.country}` : c.name,
+        ])
+      );
+
+      const sanitizedCustomers = customers.map((c) => ({
+        _id: c._id,
+        code: c.code,
+        name: isInspector ? `INSPECTOR-REDACTED-${c.country}` : c.name,
+        country: c.country,
+        allowedCountries: c.allowedCountries,
       }));
+
+      // Combined drums & packages list for unified Gebinde explorer
+      const combinedDrums = [
+        ...drums.map((d) => {
+          const sanitized = sanitizeRecord(
+            d as unknown as Record<string, unknown>,
+            showPrices
+          );
+          return {
+            ...sanitized,
+            _id: d._id,
+            drumCode: d.drumCode,
+            country: d.country,
+            netKg: d.netKg,
+            status: d.status,
+            location: d.location,
+            incomingLotId: d.incomingLotId ? d.incomingLotId.toHexString() : '',
+            originComposition: sanitizeOriginSlicesForRole(
+              d.originComposition || [],
+              actorRole
+            ),
+          };
+        }),
+        ...packages.map((p) => {
+          const sanitized = sanitizeRecord(
+            p as unknown as Record<string, unknown>,
+            showPrices
+          );
+          return {
+            ...sanitized,
+            _id: p._id,
+            drumCode: p.packageCode,
+            country: p.country,
+            netKg: p.netKg,
+            status: p.status,
+            location: p.location,
+            incomingLotId: p.incomingLotId ? p.incomingLotId.toHexString() : '',
+            originComposition: sanitizeOriginSlicesForRole(
+              p.originComposition || [],
+              actorRole
+            ),
+          };
+        }),
+      ];
 
       return {
         queriedCode: cleanCode,
@@ -349,77 +411,101 @@ export class TraceService {
         pricesVisible: showPrices,
         snapshotAt: new Date().toISOString(),
         upstream: {
-          incomingLots: incomingLots.map((lot) =>
-            sanitizeIncomingLot(
+          incomingLots: incomingLots.map((lot) => {
+            const sanitizedLot = sanitizeIncomingLot(
               lot as unknown as Record<string, unknown>,
               lot.country,
               showPrices,
               isInspector
-            )
-          ),
-          drumsCount: drums.length,
-          drums: drums.map((drum) => ({
-            ...sanitizeRecord(
-              drum as unknown as Record<string, unknown>,
-              showPrices
-            ),
-            originComposition: sanitizeOriginSlicesForRole(
-              drum.originComposition ?? [],
-              actorRole
-            ),
-          })),
-          packages: stockPackages.map((stockPackage) => ({
-            ...sanitizeRecord(
-              stockPackage as unknown as Record<string, unknown>,
-              showPrices
-            ),
-            originComposition: sanitizeOriginSlicesForRole(
-              stockPackage.originComposition ?? [],
-              actorRole
-            ),
-          })),
+            );
+            const lab = labByLotId.get(lot._id.toHexString());
+
+            return {
+              ...sanitizedLot,
+              sourceNameSnapshot: sanitizedLot.sourceNameSnapshot as string,
+              drumsCount: lot.drumsCount || lot.totalQuantity || 0,
+              qsiSummary: lab
+                ? {
+                    labName: lab.labName,
+                    reportNo: lab.reportNo,
+                    moisturePct: lab.moisturePct ?? null,
+                    hmfMgPerKg: lab.hmfMgPerKg ?? null,
+                    diastaseDn: lab.diastaseDn ?? null,
+                    c4SugarPassed: lab.c4SugarPassed,
+                    nmrPassed: lab.nmrPassed,
+                    attachmentId: lab.attachmentId ?? null,
+                  }
+                : null,
+            };
+          }),
+          drumsCount: combinedDrums.length,
+          drums: combinedDrums,
         },
         production: {
-          batches: batches.map((batch) => ({
-            ...sanitizeRecord(
-              batch as unknown as Record<string, unknown>,
+          batches: batches.map((b) => {
+            const reworkInputKg = roundKg(
+              (b.originComposition || [])
+                .filter((s) => Boolean(s.sourceReworkId))
+                .reduce((sum, s) => sum + Number(s.kg || 0), 0)
+            );
+            const totalKg = roundKg(Number(b.approvedKg || b.plannedKg || 0));
+            const sanitizedBatch = sanitizeRecord(
+              b as unknown as Record<string, unknown>,
               showPrices
-            ),
-            originComposition: sanitizeOriginSlicesForRole(
-              batch.originComposition ?? [],
-              actorRole
-            ),
-          })),
-          batchInputs: batchInputs.map((input) => ({
-            ...sanitizeRecord(
-              input as unknown as Record<string, unknown>,
+            );
+            return {
+              ...sanitizedBatch,
+              reworkInputKg,
+              reworkInputPct:
+                totalKg > 0 ? Number(((reworkInputKg / totalKg) * 100).toFixed(2)) : 0,
+              originComposition: sanitizeOriginSlicesForRole(
+                b.originComposition || [],
+                actorRole
+              ),
+            };
+          }),
+          batchInputs: batchInputs.map((inp) => {
+            const sanitizedInput = sanitizeRecord(
+              inp as unknown as Record<string, unknown>,
               showPrices
-            ),
-            originSnapshot: sanitizeOriginSlicesForRole(
-              input.originSnapshot ?? [],
-              actorRole
-            ),
-          })),
+            );
+            return {
+              ...sanitizedInput,
+              originSnapshot: sanitizeOriginSlicesForRole(
+                inp.originSnapshot || [],
+                actorRole
+              ),
+            };
+          }),
           processSteps,
-          reworkStocks: reworkStocks.map((rework) => ({
-            ...sanitizeRecord(
-              rework as unknown as Record<string, unknown>,
+          reworkStocks: reworkStocks.map((rw) => {
+            const sanitizedRework = sanitizeRecord(
+              rw as unknown as Record<string, unknown>,
               showPrices
-            ),
-            origin: sanitizeOriginSlicesForRole(rework.origin ?? [], actorRole),
-          })),
+            );
+            return {
+              ...sanitizedRework,
+              origin: sanitizeOriginSlicesForRole(rw.origin || [], actorRole),
+            };
+          }),
         },
         downstream: {
-          shipmentLots: shipmentLots.map((shipment) => ({
-            ...sanitizeRecord(
-              shipment as unknown as Record<string, unknown>,
+          shipmentLots: shipmentLots.map((shp) => {
+            const sanitizedShipment = sanitizeRecord(
+              shp as unknown as Record<string, unknown>,
               showPrices
-            ),
-            originComposition: sanitizeOriginSlicesForRole(
-              shipment.originComposition ?? [],
-              actorRole
-            ),
-          })),
+            );
+            return {
+              ...sanitizedShipment,
+              customerDisplayName:
+                customerMap.get(shp.customerId.toHexString()) ||
+                `BUYER-${shp.destinationCountry}`,
+              originComposition: sanitizeOriginSlicesForRole(
+                shp.originComposition || [],
+                actorRole
+              ),
+            };
+          }),
           customers: sanitizedCustomers,
         },
         ledgerMovements: stockMovements,
@@ -427,7 +513,177 @@ export class TraceService {
     });
   }
 
+  // Alias for backward compatibility
   static async traceEntity(queryCode: string, actorRole: string) {
     return this.traceByReference(queryCode, actorRole);
+  }
+
+  /**
+   * IFS Food v8 Clause 4.18.2 Instant Regulatory Hold ("Charge sofort sperren")
+   * Atomically locks unconsumed drums in Quarantine and places unshipped ShipmentLots on QA_HOLD.
+   */
+  static async placeRegulatoryHold(
+    queryCode: string,
+    userId: string,
+    actorRole: string,
+    reason: string
+  ) {
+    const cleanCode = queryCode.trim().toUpperCase();
+    if (!cleanCode) {
+      throw AppError.badRequest('INVALID_TRACE_CODE', 'Provide a reference code to hold.');
+    }
+
+    return withTransaction(async (session: ClientSession) => {
+      const actorObjectId = new Types.ObjectId(userId);
+
+      const directLot = await IncomingLotModel.findOne({ lotNo: cleanCode }).session(session);
+      const directDrum = await DrumModel.findOne({
+        $or: [{ drumCode: cleanCode }, { barcode: cleanCode }],
+      }).session(session);
+      const directBatch = await BatchModel.findOne({ processNo: cleanCode, isVoid: false }).session(session);
+      const directShipment = await ShipmentLotModel.findOne({
+        shipmentLotNo: cleanCode,
+        isVoid: false,
+      }).session(session);
+      const directPackage = await StockPackageModel.findOne({ packageCode: cleanCode }).session(session);
+
+      if (!directLot && !directDrum && !directBatch && !directShipment && !directPackage) {
+        throw AppError.notFound('Traceable entity for Regulatory Hold', cleanCode);
+      }
+
+      const targetBatchIds = new Set<string>();
+      const targetLotIds = new Set<string>();
+
+      if (directLot) targetLotIds.add(directLot._id.toHexString());
+      if (directDrum) {
+        if (directDrum.incomingLotId) targetLotIds.add(directDrum.incomingLotId.toHexString());
+        if (directDrum.reservedBatchId) {
+          targetBatchIds.add(directDrum.reservedBatchId.toHexString());
+        }
+      }
+      if (directPackage) {
+        if (directPackage.incomingLotId) targetLotIds.add(directPackage.incomingLotId.toHexString());
+        if (directPackage.reservedBatchId) {
+          targetBatchIds.add(directPackage.reservedBatchId.toHexString());
+        }
+      }
+      if (directBatch) {
+        targetBatchIds.add(directBatch._id.toHexString());
+        for (const s of directBatch.originComposition || []) {
+          targetLotIds.add(s.incomingLotId.toHexString());
+        }
+      }
+      if (directShipment) {
+        targetBatchIds.add(directShipment.batchId.toHexString());
+      }
+
+      const lotObjectIds = Array.from(targetLotIds).map((id) => new Types.ObjectId(id));
+      const batchObjectIds = Array.from(targetBatchIds).map(
+        (id) => new Types.ObjectId(id)
+      );
+
+      // 1. Place all unconsumed drums from affected lots/batches into Quarantine
+      const holdableDrums = await DrumModel.find({
+        $or: [
+          ...(directDrum ? [{ _id: directDrum._id }] : []),
+          { incomingLotId: { $in: lotObjectIds } },
+          { reservedBatchId: { $in: batchObjectIds } },
+        ],
+        status: { $in: ['Approved', 'InWarehouse', 'Reserved', 'InWarmRoom'] },
+      }).session(session);
+
+      for (const drum of holdableDrums) {
+        const prevStatus = drum.status;
+        const prevLocation = drum.location;
+        drum.status = 'Quarantine';
+        drum.location = 'QuarantineZone';
+        drum.reservedBatchId = null;
+        await drum.save({ session });
+
+        await StockMovementModel.create(
+          [
+            {
+              movementType: 'RECEIVE_QUARANTINE',
+              drumId: drum._id,
+              incomingLotId: drum.incomingLotId,
+              materialId: drum.materialId,
+              country: drum.country,
+              fromStatus: prevStatus,
+              toStatus: 'Quarantine',
+              fromLocation: prevLocation,
+              toLocation: 'QuarantineZone',
+              signedKg: 0,
+              reason: `IFS Regulatory Hold on ${cleanCode}: ${reason}`,
+              performedBy: actorObjectId,
+            },
+          ],
+          { session }
+        );
+      }
+
+      // 2. Place any non-shipped downstream ShipmentLots on QA_HOLD
+      const holdableShipments = await ShipmentLotModel.find({
+        $or: [
+          ...(directShipment ? [{ _id: directShipment._id }] : []),
+          { batchId: { $in: batchObjectIds } },
+        ],
+        status: { $nin: ['SHIPPED', 'VOID', 'QA_HOLD'] },
+        isVoid: false,
+      }).session(session);
+
+      for (const shp of holdableShipments) {
+        shp.status = 'QA_HOLD';
+        await shp.save({ session });
+      }
+
+      // 3. Emit CRITICAL notification to Admin, Management, QA, Warehouse, Production
+      await NotificationModel.create(
+        [
+          {
+            type: 'DEVIATION_MISMATCH',
+            severity: 'CRITICAL',
+            title: `IFS Regulatory Hold Executed on ${cleanCode}`,
+            message: `${holdableDrums.length} package(s) quarantined and ${holdableShipments.length} Shipment LOT(s) placed on QA_HOLD. Reason: ${reason}`,
+            targetRoles: ['Admin', 'Management', 'QA_LEAD', 'WAREHOUSE', 'PLANT_OPERATOR'],
+            entityType: 'BATCH',
+            entityId:
+              directBatch?._id ??
+              directLot?._id ??
+              directShipment?._id ??
+              directDrum?._id ??
+              directPackage?._id,
+          },
+        ],
+        { session }
+      );
+
+      await recordAudit({
+        actorId: userId,
+        actorRole,
+        module: 'trace',
+        action: 'REGULATORY_HOLD',
+        entityType: 'TRACE_CHAIN',
+        entityId:
+          directBatch?._id ??
+          directLot?._id ??
+          directShipment?._id ??
+          (directDrum?._id || directPackage?._id)!,
+        entityRef: cleanCode,
+        after: {
+          queriedCode: cleanCode,
+          drumsQuarantined: holdableDrums.length,
+          shipmentLotsHeld: holdableShipments.length,
+        },
+        reason,
+        session,
+      });
+
+      return {
+        queriedCode: cleanCode,
+        drumsQuarantined: holdableDrums.length,
+        shipmentLotsHeld: holdableShipments.length,
+        heldAt: new Date().toISOString(),
+      };
+    });
   }
 }
